@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sakura Petal – Folded Plane + Options</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #1a0a14; }
+    canvas { display: block; }
+    #info {
+      position: absolute; top: 12px; left: 12px; color: #ffeef5;
+      font: 14px/1.4 system-ui, sans-serif; pointer-events: none;
+      text-shadow: 0 1px 4px #000; z-index: 1;
+    }
+    #controls {
+      position: absolute; top: 12px; right: 12px; z-index: 2;
+      background: rgba(30, 10, 20, 0.75); color: #ffeef5;
+      padding: 14px 16px; border-radius: 10px; font: 14px system-ui, sans-serif;
+      backdrop-filter: blur(6px); min-width: 210px;
+    }
+    #controls label { display: block; margin: 8px 0 4px; font-weight: 500; }
+    #controls select {
+      width: 100%; padding: 4px; background: #2a1520; color: #ffeef5; border: 1px solid #553344; border-radius: 4px;
+    }
+    #controls .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div id="info">
+    Single sakura petal<br>
+    Folded plane (~7°) · shader creates rounded shape + edge transparency
+  </div>
+  <div id="controls">
+    <div class="row">
+      <input type="checkbox" id="wireframe" />
+      <label for="wireframe" style="margin:0; font-weight:normal;">Wireframe</label>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ---------- Folded plane (2 quads, ~7° fold) ----------
+    function createFoldedPlane(foldDegrees = 7) {
+      const geo = new THREE.BufferGeometry();
+      const rad = (foldDegrees * Math.PI) / 180;
+      const halfW = 0.5;
+      const halfH = 0.7;
+      const z = Math.tan(rad) * halfW;
+
+      // 6 vertices: left-bottom, left-top, center-bottom, center-top, right-bottom, right-top
+      const positions = new Float32Array([
+        -halfW, -halfH, z,   // 0 left bottom
+        -halfW,  halfH, z,   // 1 left top
+         0,     -halfH, 0,   // 2 center bottom
+         0,      halfH, 0,   // 3 center top
+         halfW, -halfH, z,   // 4 right bottom
+         halfW,  halfH, z    // 5 right top
+      ]);
+
+      const uvs = new Float32Array([
+        0, 0,
+        0, 1,
+        0.5, 0,
+        0.5, 1,
+        1, 0,
+        1, 1
+      ]);
+
+      // Two quads (4 triangles)
+      const indices = [
+        0, 2, 1,  1, 2, 3,  // left quad
+        2, 4, 3,  3, 4, 5   // right quad
+      ];
+
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    function createPetalShape() {
+      const shape = new THREE.Shape();
+      shape.moveTo(0, -0.68);
+      shape.quadraticCurveTo(0.48, -0.25, 0.38, 0.35);
+      shape.quadraticCurveTo(0.22, 0.72, 0.04, 0.66);
+      shape.quadraticCurveTo(-0.22, 0.72, -0.38, 0.35);
+      shape.quadraticCurveTo(-0.48, -0.25, 0, -0.68);
+      return shape;
+    }
+
+    function createGeometries() {
+      // 1. Folded plane – 2 quads at ~7°
+      const simple = createFoldedPlane(7);
+
+      const shape = createPetalShape();
+
+      // 2. Extruded
+      const medium = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.045,
+        bevelEnabled: true,
+        bevelThickness: 0.018,
+        bevelSize: 0.02,
+        bevelSegments: 2,
+        curveSegments: 12
+      });
+      medium.center();
+      medium.scale(1.15, 1.15, 1);
+      medium.rotateX(-Math.PI / 2);
+
+      // 3. Detailed extruded
+      const detailed = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.055,
+        bevelEnabled: true,
+        bevelThickness: 0.025,
+        bevelSize: 0.028,
+        bevelOffset: -0.005,
+        bevelSegments: 4,
+        curveSegments: 24
+      });
+      detailed.center();
+      detailed.scale(1.15, 1.15, 1);
+      detailed.rotateX(-Math.PI / 2);
+
+      [medium, detailed].forEach(geo => {
+        geo.computeBoundingBox();
+        const bbox = geo.boundingBox;
+        const size = new THREE.Vector3();
+        bbox.getSize(size);
+        const uv = geo.attributes.uv;
+        if (uv) {
+          for (let i = 0; i < uv.count; i++) {
+            const x = (uv.getX(i) - bbox.min.x) / size.x;
+            const y = (uv.getY(i) - bbox.min.y) / size.y;
+            uv.setXY(i, x, y);
+          }
+          uv.needsUpdate = true;
+        }
+      });
+
+      return [simple, medium, detailed];
+    }
+
+    const geometries = createGeometries();
+
+    const material = new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      wireframe: false,
+      uniforms: {
+        uColorA: { value: new THREE.Color(0xfff6fa) },
+        uColorB: { value: new THREE.Color(0xff9ec4) },
+        uEdgeFade: { value: 0.045 },
+        uOpacity: { value: 0.94 }
+      },
+      vertexShader: /* glsl */`
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          // Fold is already in the geometry for the simple mesh.
+          // Very subtle extra curve only.
+          vec3 pos = position;
+          pos.z += sin(uv.y * 3.14159) * 0.04 * (1.0 - abs(uv.x - 0.5) * 2.0);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform vec3 uColorA;
+        uniform vec3 uColorB;
+        uniform float uEdgeFade;
+        uniform float uOpacity;
+        varying vec2 vUv;
+
+        // Proper sakura petal SDF – rounded tip AND rounded base
+        float petalSDF(vec2 p) {
+          vec2 q = p;
+
+          // Stretch to petal proportions
+          q.x *= 1.05;
+          q.y *= 0.92;
+
+          // Classic petal body (wider middle, rounded ends)
+          float body = length(q / vec2(0.40, 0.55)) - 1.0;
+
+          // Round the top
+          body = max(body, q.y - 0.52);
+
+          // Round the bottom (this was missing – prevents the white rectangle)
+          body = max(body, -q.y - 0.48);
+
+          // Soft side taper near the base so it doesn’t flare
+          float baseTaper = smoothstep(-0.15, -0.45, q.y);
+          body += baseTaper * abs(q.x) * 0.35;
+
+          return body;
+        }
+
+        void main() {
+          vec2 p = (vUv - 0.5) * vec2(1.0, 1.3);
+          float d = petalSDF(p);
+
+          // Soft transparent edge
+          float edge = smoothstep(uEdgeFade, 0.0, d);
+          float alpha = edge * uOpacity;
+
+          // White at base → pink toward tip
+          float grad = smoothstep(-0.25, 0.35, p.y);
+          vec3 color = mix(uColorA, uColorB, grad);
+
+          // Soft vein
+          float vein = smoothstep(0.022, 0.0, abs(p.x)) * (1.0 - smoothstep(-0.1, 0.5, p.y));
+          color += vein * 0.07;
+
+          // Discard everything outside the rounded petal
+          if (d > 0.0 || alpha < 0.04) discard;
+
+          gl_FragColor = vec4(color, alpha);
+        }
+      `
+    });
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a0a14);
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 20);
+    camera.position.set(0, 0.15, 2.4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, 0, 0);
+
+    const hemi = new THREE.HemisphereLight(0xffeef8, 0x3a1520, 0.9);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 0.35);
+    dir.position.set(2, 3, 2);
+    scene.add(dir);
+
+    let currentMesh = null;
+
+    function setGeometry(index) {
+      if (currentMesh) scene.remove(currentMesh);
+      currentMesh = new THREE.Mesh(geometries[index], material);
+      currentMesh.rotation.x = -0.15; // slight tilt for better view
+      scene.add(currentMesh);
+    }
+
+    setGeometry(0);
+
+    document.getElementById('wireframe').addEventListener('change', (e) => {
+      material.wireframe = e.target.checked;
+      material.needsUpdate = true;
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (currentMesh) currentMesh.rotation.y += 0.003;
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
