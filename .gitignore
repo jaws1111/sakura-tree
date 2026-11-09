@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+qc-artifacts/
+.vite/
+coverage/
+*.local
+.idea/
+.vscode/
