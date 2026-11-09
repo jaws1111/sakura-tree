@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { buildSpaceColonizationSkeleton } from '../src/tree/skeleton.js';
 import { bakeMarchingCubes } from '../src/tree/mesher.js';
 import { buildTwigProxyGroup } from '../src/tree/twigProxy.js';
+import { bakeHybrid } from '../src/tree/hybridMesher.js';
 import { CanopyInstancer } from '../src/petals/CanopyInstancer.js';
 
 function arg(name, fallback) {
@@ -63,28 +64,50 @@ console.log('1 skeleton', {
   shoots: skeleton.stats.shootEdges
 });
 
+// --mesher hybrid (v1.1 default) | mc (v1.0: marching cubes + twig proxy cylinders)
+const mesher = String(arg('mesher', 'hybrid'));
+let mcMs = 0;
+let twMs = 0;
 t = performance.now();
-const mc = bakeMarchingCubes(skeleton, {
-  voxelM,
-  simplifyCellScale: 1.15,
-  nearestK: 12
-});
-const mcMs = ms(t);
-console.log('2 marchingCubes', {
-  ms: +mcMs.toFixed(0),
-  tris: mc.stats.triangles,
-  simplify: mc.stats.simplify
-    ? `${(mc.stats.simplify.reduction * 100).toFixed(0)}%`
-    : null
-});
+if (mesher === 'mc') {
+  const mc = bakeMarchingCubes(skeleton, {
+    voxelM,
+    simplifyCellScale: 1.15,
+    nearestK: 12
+  });
+  mcMs = ms(t);
+  console.log('2 marchingCubes', {
+    ms: +mcMs.toFixed(0),
+    tris: mc.stats.triangles,
+    simplify: mc.stats.simplify
+      ? `${(mc.stats.simplify.reduction * 100).toFixed(0)}%`
+      : null
+  });
 
-t = performance.now();
-const proxy = buildTwigProxyGroup(skeleton, voxelM);
-const twMs = ms(t);
-console.log('3 twigProxy', {
-  ms: +twMs.toFixed(0),
-  count: proxy?.userData?.twigCount ?? 0
-});
+  t = performance.now();
+  const proxy = buildTwigProxyGroup(skeleton, voxelM);
+  twMs = ms(t);
+  console.log('3 twigProxy', {
+    ms: +twMs.toFixed(0),
+    count: proxy?.userData?.twigCount ?? 0
+  });
+} else {
+  delete skeleton.woodSurface;
+  const hy = bakeHybrid(skeleton, { cellM: Math.min(0.12, Math.max(0.03, voxelM * 0.6)) });
+  mcMs = ms(t);
+  console.log('2 hybridMesher (surface nets + tubes)', {
+    ms: +mcMs.toFixed(0),
+    tris: hy.stats.triangles,
+    barkTris: hy.stats.barkTriangles,
+    tubeTris: hy.stats.tubeTriangles,
+    stages: {
+      chains: +hy.stats.msChains.toFixed(0),
+      surface: +hy.stats.msSurface.toFixed(0),
+      decimate: +hy.stats.msDecimate.toFixed(0),
+      tubes: +hy.stats.msTubes.toFixed(0)
+    }
+  });
+}
 
 t = performance.now();
 const scene = new THREE.Scene();
@@ -116,8 +139,8 @@ console.log('=== total refresh ===', {
   ms: +total.toFixed(0),
   breakdown: {
     skeleton: pct(skMs, total),
-    mc: pct(mcMs, total),
-    twigs: pct(twMs, total),
+    mesh: pct(mcMs, total),
+    twigProxy: pct(twMs, total),
     canopy: pct(canMs, total)
   }
 });

@@ -1,0 +1,734 @@
+{
+  "skParams": {
+    "seed": 42,
+    "attractorCount": 700,
+    "maxIterations": 160,
+    "rootAttractorCount": 315,
+    "maxRootIterations": 104,
+    "twigDensity": 1.5,
+    "twigBranchMult": 2,
+    "forkYM": 1.1
+  },
+  "rows": [
+    {
+      "variant": "v1.0",
+      "ms": 1305,
+      "tris": 403922,
+      "verts": 696652,
+      "barkTris": 8162,
+      "tubeTris": 395760,
+      "barkOpenEdges": 0,
+      "barkNonManifold": 45,
+      "barkFlipped": 0,
+      "barkShells": 2,
+      "barkEuler": 31,
+      "tubeShells": 330,
+      "windingOkPct": 98,
+      "barkMeanMinAngle": 38.7,
+      "barkPctBelow10": 1.5,
+      "seatGapP50mm": 3.23,
+      "seatGapP95mm": 7.23,
+      "seatOver2mmPct": 76,
+      "seatOver4mmPct": 15
+    },
+    {
+      "variant": "sdf-only",
+      "ms": 3438,
+      "tris": 92736,
+      "verts": 54547,
+      "barkTris": 92734,
+      "tubeTris": 0,
+      "barkOpenEdges": 0,
+      "barkNonManifold": 700,
+      "barkFlipped": 0,
+      "barkShells": 612,
+      "barkEuler": 1905,
+      "tubeShells": 0,
+      "windingOkPct": 94.1,
+      "barkMeanMinAngle": 38,
+      "barkPctBelow10": 5.2,
+      "seatGapP50mm": 43.96,
+      "seatGapP95mm": 303.39,
+      "seatOver2mmPct": 96.1,
+      "seatOver4mmPct": 92.7
+    },
+    {
+      "variant": "hybrid-60",
+      "ms": 153,
+      "tris": 201738,
+      "verts": 167602,
+      "barkTris": 5222,
+      "tubeTris": 196516,
+      "barkOpenEdges": 0,
+      "barkNonManifold": 7,
+      "barkFlipped": 0,
+      "barkShells": 1,
+      "barkEuler": 2,
+      "tubeShells": 10291,
+      "windingOkPct": 99.9,
+      "barkMeanMinAngle": 37.7,
+      "barkPctBelow10": 1.8,
+      "seatGapP50mm": 0.32,
+      "seatGapP95mm": 0.64,
+      "seatOver2mmPct": 1.3,
+      "seatOver4mmPct": 0.4
+    },
+    {
+      "variant": "hybrid-40",
+      "ms": 240,
+      "tris": 213884,
+      "verts": 174081,
+      "barkTris": 18628,
+      "tubeTris": 195256,
+      "barkOpenEdges": 0,
+      "barkNonManifold": 10,
+      "barkFlipped": 0,
+      "barkShells": 1,
+      "barkEuler": 2,
+      "tubeShells": 10291,
+      "windingOkPct": 99.9,
+      "barkMeanMinAngle": 37.5,
+      "barkPctBelow10": 1.2,
+      "seatGapP50mm": 0.32,
+      "seatGapP95mm": 0.64,
+      "seatOver2mmPct": 1.3,
+      "seatOver4mmPct": 0.4
+    },
+    {
+      "variant": "hybrid-30",
+      "ms": 411,
+      "tris": 239468,
+      "verts": 187801,
+      "barkTris": 46252,
+      "tubeTris": 193216,
+      "barkOpenEdges": 0,
+      "barkNonManifold": 17,
+      "barkFlipped": 0,
+      "barkShells": 1,
+      "barkEuler": 2,
+      "tubeShells": 10291,
+      "windingOkPct": 99.9,
+      "barkMeanMinAngle": 37.8,
+      "barkPctBelow10": 1.3,
+      "seatGapP50mm": 0.32,
+      "seatGapP95mm": 0.65,
+      "seatOver2mmPct": 1.3,
+      "seatOver4mmPct": 0.4
+    },
+    {
+      "variant": "hybrid-20",
+      "ms": 1107,
+      "tris": 315556,
+      "verts": 227537,
+      "barkTris": 123812,
+      "tubeTris": 191744,
+      "barkOpenEdges": 0,
+      "barkNonManifold": 28,
+      "barkFlipped": 0,
+      "barkShells": 1,
+      "barkEuler": 2,
+      "tubeShells": 10291,
+      "windingOkPct": 100,
+      "barkMeanMinAngle": 38,
+      "barkPctBelow10": 1.2,
+      "seatGapP50mm": 0.32,
+      "seatGapP95mm": 0.65,
+      "seatOver2mmPct": 1.3,
+      "seatOver4mmPct": 0.3
+    }
+  ],
+  "details": {
+    "v1.0": {
+      "row": {
+        "variant": "v1.0",
+        "ms": 1305,
+        "tris": 403922,
+        "verts": 696652,
+        "barkTris": 8162,
+        "tubeTris": 395760,
+        "barkOpenEdges": 0,
+        "barkNonManifold": 45,
+        "barkFlipped": 0,
+        "barkShells": 2,
+        "barkEuler": 31,
+        "tubeShells": 330,
+        "windingOkPct": 98,
+        "barkMeanMinAngle": 38.7,
+        "barkPctBelow10": 1.5,
+        "seatGapP50mm": 3.23,
+        "seatGapP95mm": 7.23,
+        "seatOver2mmPct": 76,
+        "seatOver4mmPct": 15
+      },
+      "coverage": [
+        {
+          "class": "tip ≤4mm",
+          "samples": 700,
+          "p50": 0.21764437396510358,
+          "p95": 0.2921368383458432,
+          "missPct": 0,
+          "absMeanMm": 0.5753099527941864
+        },
+        {
+          "class": "twig 4–14mm",
+          "samples": 700,
+          "p50": 0.15833071829988818,
+          "p95": 0.34938815830466996,
+          "missPct": 0,
+          "absMeanMm": 1.3780872115190397
+        },
+        {
+          "class": "shoot 14–50mm",
+          "samples": 700,
+          "p50": 0.187197131599328,
+          "p95": 0.3219674256627955,
+          "missPct": 0,
+          "absMeanMm": 5.256175258146608
+        },
+        {
+          "class": "limb >50mm",
+          "samples": 700,
+          "p50": 0.08241313169510865,
+          "p95": 0.24233160109947569,
+          "missPct": 0,
+          "absMeanMm": 7.522479246022966
+        }
+      ],
+      "extra": {
+        "barkTris": 8162,
+        "proxyInstances": 24735,
+        "drawCalls": 2
+      }
+    },
+    "sdf-only": {
+      "row": {
+        "variant": "sdf-only",
+        "ms": 3438,
+        "tris": 92736,
+        "verts": 54547,
+        "barkTris": 92734,
+        "tubeTris": 0,
+        "barkOpenEdges": 0,
+        "barkNonManifold": 700,
+        "barkFlipped": 0,
+        "barkShells": 612,
+        "barkEuler": 1905,
+        "tubeShells": 0,
+        "windingOkPct": 94.1,
+        "barkMeanMinAngle": 38,
+        "barkPctBelow10": 5.2,
+        "seatGapP50mm": 43.96,
+        "seatGapP95mm": 303.39,
+        "seatOver2mmPct": 96.1,
+        "seatOver4mmPct": 92.7
+      },
+      "coverage": [
+        {
+          "class": "tip ≤4mm",
+          "samples": 700,
+          "p50": 22.755895299162795,
+          "p95": null,
+          "missPct": 97.57142857142857,
+          "absMeanMm": 111.77979263472963
+        },
+        {
+          "class": "twig 4–14mm",
+          "samples": 700,
+          "p50": 4.135552331479927,
+          "p95": 43.35029969627397,
+          "missPct": 89.28571428571429,
+          "absMeanMm": 71.3199585229027
+        },
+        {
+          "class": "shoot 14–50mm",
+          "samples": 700,
+          "p50": 0.0928747447786233,
+          "p95": 1.3849237027758565,
+          "missPct": 17.428571428571427,
+          "absMeanMm": 6.653598882841211
+        },
+        {
+          "class": "limb >50mm",
+          "samples": 700,
+          "p50": 0.010908922767354983,
+          "p95": 0.39513345722200377,
+          "missPct": 2,
+          "absMeanMm": 5.071006885594261
+        }
+      ],
+      "extra": {
+        "stats": {
+          "mesher": "hybrid",
+          "voxelM": 0.031241748867630613,
+          "cellM": 0.031241748867630613,
+          "rCut": 0,
+          "chains": 11547,
+          "thickChains": 11547,
+          "thinChains": 0,
+          "simplify": {
+            "trianglesBefore": 130712,
+            "trianglesAfter": 92736,
+            "reduction": 0.29053185629475486
+          },
+          "surfaceVertsRaw": 66562,
+          "surfaceTrisRaw": 130712,
+          "sdfSamples": 474217,
+          "seamVerts": 6973,
+          "vertices": 54547,
+          "triangles": 92736,
+          "barkVertices": 54547,
+          "barkTriangles": 92736,
+          "barkIndexCount": 278208,
+          "tubeVertices": 0,
+          "tubeTriangles": 0,
+          "tubeRings": 0,
+          "tubeStarts": 0,
+          "msChains": 46.12339999999949,
+          "msSdf": 32.822000000000116,
+          "msSurface": 1217.0648999999994,
+          "msRelax": 81.52300000000105,
+          "msDecimate": 1986.7194999999992,
+          "msAttributes": 68.89240000000063,
+          "msTubes": 0.06660000000010768,
+          "msMerge": 4.804899999999179,
+          "msTotal": 3438.016699999999,
+          "boundsMinM": {
+            "x": -4.196547985076904,
+            "y": -0.19660760462284088,
+            "z": -3.7505295276641846
+          },
+          "boundsMaxM": {
+            "x": 3.8437182903289795,
+            "y": 8.843222618103027,
+            "z": 4.202147483825684
+          }
+        },
+        "drawCalls": 1
+      }
+    },
+    "hybrid-60": {
+      "row": {
+        "variant": "hybrid-60",
+        "ms": 153,
+        "tris": 201738,
+        "verts": 167602,
+        "barkTris": 5222,
+        "tubeTris": 196516,
+        "barkOpenEdges": 0,
+        "barkNonManifold": 7,
+        "barkFlipped": 0,
+        "barkShells": 1,
+        "barkEuler": 2,
+        "tubeShells": 10291,
+        "windingOkPct": 99.9,
+        "barkMeanMinAngle": 37.7,
+        "barkPctBelow10": 1.8,
+        "seatGapP50mm": 0.32,
+        "seatGapP95mm": 0.64,
+        "seatOver2mmPct": 1.3,
+        "seatOver4mmPct": 0.4
+      },
+      "coverage": [
+        {
+          "class": "tip ≤4mm",
+          "samples": 700,
+          "p50": 0.22533293410339586,
+          "p95": 0.37355115641284564,
+          "missPct": 0,
+          "absMeanMm": 0.6469048660038527
+        },
+        {
+          "class": "twig 4–14mm",
+          "samples": 700,
+          "p50": 0.06912709104758469,
+          "p95": 0.2736455254740414,
+          "missPct": 0.42857142857142855,
+          "absMeanMm": 0.7878573632315388
+        },
+        {
+          "class": "shoot 14–50mm",
+          "samples": 700,
+          "p50": 0.0252333365817025,
+          "p95": 0.11046567963631046,
+          "missPct": 0,
+          "absMeanMm": 0.9887230927479775
+        },
+        {
+          "class": "limb >50mm",
+          "samples": 700,
+          "p50": 0.019051559080640545,
+          "p95": 0.1064582760219942,
+          "missPct": 0.14285714285714285,
+          "absMeanMm": 2.66788386375583
+        }
+      ],
+      "extra": {
+        "stats": {
+          "mesher": "hybrid",
+          "voxelM": 0.06,
+          "cellM": 0.06,
+          "rCut": 0.08399999999999999,
+          "chains": 11547,
+          "thickChains": 5,
+          "thinChains": 11542,
+          "simplify": {
+            "trianglesBefore": 9496,
+            "trianglesAfter": 5222,
+            "reduction": 0.4500842459983151
+          },
+          "surfaceVertsRaw": 4743,
+          "surfaceTrisRaw": 9496,
+          "sdfSamples": 19149,
+          "seamVerts": 238,
+          "vertices": 167602,
+          "triangles": 201738,
+          "barkVertices": 2844,
+          "barkTriangles": 5222,
+          "barkIndexCount": 15666,
+          "tubeVertices": 164758,
+          "tubeTriangles": 196516,
+          "tubeRings": 36263,
+          "tubeStarts": 11547,
+          "msChains": 40.85230000000047,
+          "msSdf": 1.1075000000000728,
+          "msSurface": 26.00799999999981,
+          "msRelax": 8.365499999999884,
+          "msDecimate": 30.684300000000803,
+          "msAttributes": 0.917699999999968,
+          "msTubes": 36.756900000000314,
+          "msMerge": 8.011099999999715,
+          "msTotal": 152.70330000000104,
+          "boundsMinM": {
+            "x": -4.302098274230957,
+            "y": -0.19539085030555725,
+            "z": -3.7611441612243652
+          },
+          "boundsMaxM": {
+            "x": 3.9304866790771484,
+            "y": 9.000589370727539,
+            "z": 4.260963439941406
+          }
+        },
+        "drawCalls": 1
+      }
+    },
+    "hybrid-40": {
+      "row": {
+        "variant": "hybrid-40",
+        "ms": 240,
+        "tris": 213884,
+        "verts": 174081,
+        "barkTris": 18628,
+        "tubeTris": 195256,
+        "barkOpenEdges": 0,
+        "barkNonManifold": 10,
+        "barkFlipped": 0,
+        "barkShells": 1,
+        "barkEuler": 2,
+        "tubeShells": 10291,
+        "windingOkPct": 99.9,
+        "barkMeanMinAngle": 37.5,
+        "barkPctBelow10": 1.2,
+        "seatGapP50mm": 0.32,
+        "seatGapP95mm": 0.64,
+        "seatOver2mmPct": 1.3,
+        "seatOver4mmPct": 0.4
+      },
+      "coverage": [
+        {
+          "class": "tip ≤4mm",
+          "samples": 700,
+          "p50": 0.22522708525667745,
+          "p95": 0.37355115641284564,
+          "missPct": 0,
+          "absMeanMm": 0.6458154775479867
+        },
+        {
+          "class": "twig 4–14mm",
+          "samples": 700,
+          "p50": 0.06912709104758469,
+          "p95": 0.2736455254740414,
+          "missPct": 0.42857142857142855,
+          "absMeanMm": 0.7878017210820194
+        },
+        {
+          "class": "shoot 14–50mm",
+          "samples": 700,
+          "p50": 0.02529369852041677,
+          "p95": 0.11046567963631046,
+          "missPct": 0,
+          "absMeanMm": 0.9895740352874088
+        },
+        {
+          "class": "limb >50mm",
+          "samples": 700,
+          "p50": 0.012460631988349338,
+          "p95": 0.04976199881982198,
+          "missPct": 0,
+          "absMeanMm": 1.6230479502742239
+        }
+      ],
+      "extra": {
+        "stats": {
+          "mesher": "hybrid",
+          "voxelM": 0.04,
+          "cellM": 0.04,
+          "rCut": 0.055999999999999994,
+          "chains": 11547,
+          "thickChains": 7,
+          "thinChains": 11540,
+          "simplify": {
+            "trianglesBefore": 33872,
+            "trianglesAfter": 18628,
+            "reduction": 0.45004723665564483
+          },
+          "surfaceVertsRaw": 16928,
+          "surfaceTrisRaw": 33872,
+          "sdfSamples": 66360,
+          "seamVerts": 710,
+          "vertices": 174081,
+          "triangles": 213884,
+          "barkVertices": 10016,
+          "barkTriangles": 18628,
+          "barkIndexCount": 55884,
+          "tubeVertices": 164065,
+          "tubeTriangles": 195256,
+          "tubeRings": 36200,
+          "tubeStarts": 11547,
+          "msChains": 29.844999999999345,
+          "msSdf": 0.49539999999979045,
+          "msSurface": 48.440200000000914,
+          "msRelax": 3.4254999999993743,
+          "msDecimate": 110.53980000000047,
+          "msAttributes": 4.180000000000291,
+          "msTubes": 33.42950000000019,
+          "msMerge": 9.973599999999351,
+          "msTotal": 240.32899999999972,
+          "boundsMinM": {
+            "x": -4.302098274230957,
+            "y": -0.1997160166501999,
+            "z": -3.7611441612243652
+          },
+          "boundsMaxM": {
+            "x": 3.9304866790771484,
+            "y": 9.000589370727539,
+            "z": 4.260963439941406
+          }
+        },
+        "drawCalls": 1
+      }
+    },
+    "hybrid-30": {
+      "row": {
+        "variant": "hybrid-30",
+        "ms": 411,
+        "tris": 239468,
+        "verts": 187801,
+        "barkTris": 46252,
+        "tubeTris": 193216,
+        "barkOpenEdges": 0,
+        "barkNonManifold": 17,
+        "barkFlipped": 0,
+        "barkShells": 1,
+        "barkEuler": 2,
+        "tubeShells": 10291,
+        "windingOkPct": 99.9,
+        "barkMeanMinAngle": 37.8,
+        "barkPctBelow10": 1.3,
+        "seatGapP50mm": 0.32,
+        "seatGapP95mm": 0.65,
+        "seatOver2mmPct": 1.3,
+        "seatOver4mmPct": 0.4
+      },
+      "coverage": [
+        {
+          "class": "tip ≤4mm",
+          "samples": 700,
+          "p50": 0.2250282414641704,
+          "p95": 0.37355115641284564,
+          "missPct": 0,
+          "absMeanMm": 0.6464166828145912
+        },
+        {
+          "class": "twig 4–14mm",
+          "samples": 700,
+          "p50": 0.06912709104758469,
+          "p95": 0.2736455254740414,
+          "missPct": 0.42857142857142855,
+          "absMeanMm": 0.7872378336400135
+        },
+        {
+          "class": "shoot 14–50mm",
+          "samples": 700,
+          "p50": 0.02800614531697887,
+          "p95": 0.10418659386675785,
+          "missPct": 0,
+          "absMeanMm": 1.0230188027662768
+        },
+        {
+          "class": "limb >50mm",
+          "samples": 700,
+          "p50": 0.00837444416151358,
+          "p95": 0.037160669884613855,
+          "missPct": 0,
+          "absMeanMm": 1.3224735765472322
+        }
+      ],
+      "extra": {
+        "stats": {
+          "mesher": "hybrid",
+          "voxelM": 0.03,
+          "cellM": 0.03,
+          "rCut": 0.041999999999999996,
+          "chains": 11547,
+          "thickChains": 21,
+          "thinChains": 11526,
+          "simplify": {
+            "trianglesBefore": 84096,
+            "trianglesAfter": 46252,
+            "reduction": 0.45000951293759517
+          },
+          "surfaceVertsRaw": 42033,
+          "surfaceTrisRaw": 84096,
+          "sdfSamples": 165690,
+          "seamVerts": 1747,
+          "vertices": 187801,
+          "triangles": 239468,
+          "barkVertices": 24858,
+          "barkTriangles": 46252,
+          "barkIndexCount": 138756,
+          "tubeVertices": 162943,
+          "tubeTriangles": 193216,
+          "tubeRings": 36098,
+          "tubeStarts": 11547,
+          "msChains": 39.959899999998015,
+          "msSdf": 0.9069999999992433,
+          "msSurface": 114.3553000000029,
+          "msRelax": 7.85649999999805,
+          "msDecimate": 208.46320000000196,
+          "msAttributes": 8.197899999999208,
+          "msTubes": 27.547699999999168,
+          "msMerge": 4.009999999998399,
+          "msTotal": 411.29749999999694,
+          "boundsMinM": {
+            "x": -4.302098274230957,
+            "y": -0.1976137012243271,
+            "z": -3.7611441612243652
+          },
+          "boundsMaxM": {
+            "x": 3.9304866790771484,
+            "y": 9.000589370727539,
+            "z": 4.260963439941406
+          }
+        },
+        "drawCalls": 1
+      }
+    },
+    "hybrid-20": {
+      "row": {
+        "variant": "hybrid-20",
+        "ms": 1107,
+        "tris": 315556,
+        "verts": 227537,
+        "barkTris": 123812,
+        "tubeTris": 191744,
+        "barkOpenEdges": 0,
+        "barkNonManifold": 28,
+        "barkFlipped": 0,
+        "barkShells": 1,
+        "barkEuler": 2,
+        "tubeShells": 10291,
+        "windingOkPct": 100,
+        "barkMeanMinAngle": 38,
+        "barkPctBelow10": 1.2,
+        "seatGapP50mm": 0.32,
+        "seatGapP95mm": 0.65,
+        "seatOver2mmPct": 1.3,
+        "seatOver4mmPct": 0.3
+      },
+      "coverage": [
+        {
+          "class": "tip ≤4mm",
+          "samples": 700,
+          "p50": 0.22522708525667745,
+          "p95": 0.37355115641284564,
+          "missPct": 0,
+          "absMeanMm": 0.6460335564815601
+        },
+        {
+          "class": "twig 4–14mm",
+          "samples": 700,
+          "p50": 0.06912709104758469,
+          "p95": 0.2736455254740414,
+          "missPct": 0.42857142857142855,
+          "absMeanMm": 0.7878573632315388
+        },
+        {
+          "class": "shoot 14–50mm",
+          "samples": 700,
+          "p50": 0.02109686418555327,
+          "p95": 0.1040377434239525,
+          "missPct": 0,
+          "absMeanMm": 0.8524679567544875
+        },
+        {
+          "class": "limb >50mm",
+          "samples": 700,
+          "p50": 0.0037307893429183786,
+          "p95": 0.02202344992958902,
+          "missPct": 0,
+          "absMeanMm": 0.9100110182697306
+        }
+      ],
+      "extra": {
+        "stats": {
+          "mesher": "hybrid",
+          "voxelM": 0.02,
+          "cellM": 0.02,
+          "rCut": 0.03,
+          "chains": 11547,
+          "thickChains": 27,
+          "thinChains": 11520,
+          "simplify": {
+            "trianglesBefore": 225116,
+            "trianglesAfter": 123812,
+            "reduction": 0.4500079958776808
+          },
+          "surfaceVertsRaw": 112532,
+          "surfaceTrisRaw": 225116,
+          "sdfSamples": 441687,
+          "seamVerts": 3545,
+          "vertices": 227537,
+          "triangles": 315556,
+          "barkVertices": 65425,
+          "barkTriangles": 123812,
+          "barkIndexCount": 371436,
+          "tubeVertices": 162112,
+          "tubeTriangles": 191744,
+          "tubeRings": 36011,
+          "tubeStarts": 11547,
+          "msChains": 52.1887999999999,
+          "msSdf": 0.6358999999974912,
+          "msSurface": 311.76710000000094,
+          "msRelax": 30.326600000000326,
+          "msDecimate": 667.0373,
+          "msAttributes": 13.29370000000199,
+          "msTubes": 26.75499999999738,
+          "msMerge": 5.065700000002835,
+          "msTotal": 1107.0701000000008,
+          "boundsMinM": {
+            "x": -4.302098274230957,
+            "y": -0.19997896254062653,
+            "z": -3.7611441612243652
+          },
+          "boundsMaxM": {
+            "x": 3.9304866790771484,
+            "y": 9.000589370727539,
+            "z": 4.260963439941406
+          }
+        },
+        "drawCalls": 1
+      }
+    }
+  }
+}

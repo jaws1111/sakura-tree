@@ -209,15 +209,17 @@ export class ProceduralSakuraEngine {
     this.scene.add(this.barkMesh);
     this.barkVolume = result;
 
-    // Thin twigs skipped by MC — add cheap tube proxies + rebind blossoms
-    try {
-      this.twigProxy = buildTwigProxyGroup(
-        result.skeleton,
-        result.stats?.voxelM ?? this.barkMesher.defaults.voxelM
-      );
-      if (this.twigProxy) this.scene.add(this.twigProxy);
-    } catch (err) {
-      console.warn('[TwigProxy] build failed', err);
+    // v1.0 (marching cubes) skips thin twigs — add cheap tube proxies. v1.1 hybrid already meshed them.
+    if (result.stats?.mesher === 'mc') {
+      try {
+        this.twigProxy = buildTwigProxyGroup(
+          result.skeleton,
+          result.stats?.voxelM ?? this.barkMesher.defaults.voxelM
+        );
+        if (this.twigProxy) this.scene.add(this.twigProxy);
+      } catch (err) {
+        console.warn('[TwigProxy] build failed', err);
+      }
     }
     try {
       this.canopy?.rebindToSkeleton?.(result.skeleton);

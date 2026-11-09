@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { buildSpaceColonizationSkeleton } from './skeleton.js';
 import { bakeMarchingCubes } from './mesher.js';
+import { bakeHybrid, HYBRID_DEFAULTS } from './hybridMesher.js';
 import { createBarkMaterial } from './barkMaterial.js';
 import {
   TREE_HEIGHT_M,
@@ -20,6 +21,8 @@ import {
 
 /** Default hero-tree bake params (quality-first playable). */
 export const DEFAULT_BAKE_PARAMS = Object.freeze({
+  /** 'hybrid' (v1.1: surface nets + swept tubes, single mesh) | 'mc' (v1.0: marching cubes + twig proxy cylinders) */
+  mesher: 'hybrid',
   seed: 42,
   attractorCount: 700,
   rootAttractorCount: 350,
@@ -119,12 +122,28 @@ export class BarkVolumeMesher {
     const t0 =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-    const { geometry, stats } = bakeMarchingCubes(skeleton, {
-      voxelM: p.voxelM ?? SDF_VOXEL_TRUNK_M * 2,
-      nearestK: p.nearestK,
-      includeBark: p.includeBark,
-      simplifyCellScale: p.simplifyCellScale ?? 1.15
-    });
+    let geometry;
+    let stats;
+    if (p.mesher === 'mc') {
+      // v1.0 path: marching cubes for thick wood only; thin wood needs buildTwigProxyGroup()
+      delete skeleton.woodSurface;
+      ({ geometry, stats } = bakeMarchingCubes(skeleton, {
+        voxelM: p.voxelM ?? SDF_VOXEL_TRUNK_M * 2,
+        nearestK: p.nearestK,
+        includeBark: p.includeBark,
+        simplifyCellScale: p.simplifyCellScale ?? 1.15
+      }));
+      stats.mesher = 'mc';
+    } else {
+      // v1.1 path: closed filleted surface nets for thick wood + swept tubes for thin wood, one mesh.
+      // The GUI "voxel" slider keeps its meaning: surface-net cell ≈ 0.6 × voxel.
+      const cellM = p.hybridCellM ?? Math.min(0.12, Math.max(0.03, (p.voxelM ?? 0.065) * 0.6));
+      ({ geometry, stats } = bakeHybrid(skeleton, {
+        cellM,
+        decimateReduction: p.hybridDecimate ?? HYBRID_DEFAULTS.decimateReduction,
+        capTubeBase: p.capTubeBase ?? false
+      }));
+    }
 
     const material = createBarkMaterial();
     const mesh = new THREE.Mesh(geometry, material);

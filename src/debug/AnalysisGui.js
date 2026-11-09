@@ -229,9 +229,10 @@ export function mountAnalysisGui(opts) {
 
   // ── Bake quality ──
   const bake = el(`<details open><summary>Bark bake quality</summary><div class="bake"></div>
-    <p class="hint">Finer voxel = smoother SDF→mesh (slower). Rebuild applies skeleton + MC.</p></details>`);
+    <p class="hint">v1.1 hybrid: filleted surface nets for thick wood + swept tubes for twigs (cell ≈ 0.6 × voxel). v1.0 MC kept for A/B. Rebuild applies skeleton + mesh.</p></details>`);
   const bakeBox = bake.querySelector('.bake');
   const bakeState = {
+    mesher: engine.barkMesher?.defaults?.mesher ?? 'hybrid',
     voxelM: engine.barkMesher?.defaults?.voxelM ?? 0.065,
     attractorCount: engine.barkMesher?.defaults?.attractorCount ?? 700,
     rootAttractorCount: engine.barkMesher?.defaults?.rootAttractorCount ?? 350,
@@ -244,6 +245,17 @@ export function mountAnalysisGui(opts) {
     forkYM: engine.barkMesher?.defaults?.forkYM ?? 2
   };
   const sliders = {};
+  const mesherRow = el(
+    `<label class="row"><span class="k">Bark mesher</span><select data-testid="mesher-select">` +
+      `<option value="hybrid">v1.1 hybrid (surface nets + tubes)</option>` +
+      `<option value="mc">v1.0 marching cubes + proxies</option></select></label>`
+  );
+  const mesherSel = mesherRow.querySelector('select');
+  mesherSel.value = bakeState.mesher;
+  mesherSel.addEventListener('change', () => {
+    bakeState.mesher = mesherSel.value;
+  });
+  bakeBox.appendChild(mesherRow);
   for (const def of [
     ['voxelM', 'Voxel size (m)', 0.04, 0.2, 0.005],
     ['attractorCount', 'Crown attractors', 200, 1600, 50],

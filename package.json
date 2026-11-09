@@ -1,7 +1,7 @@
 {
   "name": "sakura-tree",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test:qc": "playwright test",
     "test:qc:headed": "playwright test --headed",
-    "bench:rebuild": "node scripts/bench-rebuild.mjs"
+    "bench:rebuild": "node scripts/bench-rebuild.mjs",
+    "bench:mesher": "node scripts/bench-mesher.mjs",
+    "test:mesh": "node scripts/test-mesher.mjs"
   },
   "dependencies": {
     "@playwright/test": "1.64.1",
