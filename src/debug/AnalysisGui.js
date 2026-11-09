@@ -320,7 +320,7 @@ export function mountAnalysisGui(opts) {
     'blossomSize',
     'Blossom size',
     0.25,
-    2.5,
+    3,
     0.05,
     engine.canopy?.sizeScale ?? 1,
     (_k, v) => {
@@ -430,11 +430,20 @@ export function mountAnalysisGui(opts) {
   const renderState = {
     castShadow: engine.canopy?.castShadow !== false,
     receiveShadow: engine.canopy?.receiveShadow !== false,
-    primaryColor: colorToHex(mat?.color),
-    centerColor: colorToHex(mat?.userData?.uniforms?.uPetalCore?.value),
-    emissiveIntensity: mat?.emissiveIntensity ?? 0.22,
-    brightBoost: mat?.userData?.uniforms?.uBrightBoost?.value ?? 0.28,
-    edgeFade: mat?.userData?.uniforms?.uEdgeFade?.value ?? 0.85,
+    primaryColor: colorToHex(
+      mat?.userData?.uniforms?.uColorPrimary?.value ?? mat?.color
+    ),
+    centerColor: colorToHex(
+      mat?.userData?.uniforms?.uColorCenter?.value ??
+        mat?.userData?.uniforms?.uPetalCore?.value
+    ),
+    emissiveIntensity: mat?.emissiveIntensity ?? 0,
+    brightBoost: mat?.userData?.uniforms?.uBrightBoost?.value ?? 0.12,
+    aoStrength: mat?.userData?.uniforms?.uAOStrength?.value ?? 0.55,
+    edgeFade: (() => {
+      const w = mat?.userData?.uniforms?.uEdgeFade?.value ?? 0.045;
+      return Math.min(1, Math.max(0, (w - 0.01) / 0.11));
+    })(),
     roughness: mat?.roughness ?? 0.62,
     opacity: mat?.opacity ?? 1,
     exposure: 1.0,
@@ -471,6 +480,7 @@ export function mountAnalysisGui(opts) {
   for (const def of [
     ['emissiveIntensity', 'Emissive', 0, 1.2, 0.01],
     ['brightBoost', 'Bright boost', 0, 1.2, 0.01],
+    ['aoStrength', 'Blossom AO', 0, 1, 0.01],
     ['edgeFade', 'Edge fade', 0, 1, 0.01],
     ['roughness', 'Roughness', 0.1, 1, 0.01],
     ['opacity', 'Opacity', 0.2, 1, 0.01],

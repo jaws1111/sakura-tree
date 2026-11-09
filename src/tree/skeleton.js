@@ -119,6 +119,62 @@ function isRootKind(kind) {
   return kind === 'root' || kind === 'taproot';
 }
 
+/**
+ * Uniform grid for nearest-node queries — colonization was O(attractors×nodes).
+ * @param {SkeletonNode[]} nodes
+ * @param {number} cellSize
+ * @param {(n: SkeletonNode) => boolean} [accept]
+ */
+function buildNodeGrid(nodes, cellSize, accept) {
+  const map = new Map();
+  const inv = 1 / Math.max(1e-4, cellSize);
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (accept && !accept(n)) continue;
+    const p = n.position;
+    const key = `${(p.x * inv) | 0},${(p.y * inv) | 0},${(p.z * inv) | 0}`;
+    const bucket = map.get(key);
+    if (bucket) bucket.push(i);
+    else map.set(key, [i]);
+  }
+  return { map, inv, cellSize };
+}
+
+/**
+ * @param {{ map: Map, inv: number, cellSize: number }} grid
+ * @param {SkeletonNode[]} nodes
+ * @param {Vec3} point
+ * @param {number} maxDist
+ * @param {(n: SkeletonNode, id: number) => boolean} [accept]
+ */
+function nearestInGrid(grid, nodes, point, maxDist, accept) {
+  const reach = Math.max(1, Math.ceil(maxDist * grid.inv));
+  const ix = (point.x * grid.inv) | 0;
+  const iy = (point.y * grid.inv) | 0;
+  const iz = (point.z * grid.inv) | 0;
+  let best = -1;
+  let bestD = maxDist;
+  for (let dz = -reach; dz <= reach; dz++) {
+    for (let dy = -reach; dy <= reach; dy++) {
+      for (let dx = -reach; dx <= reach; dx++) {
+        const bucket = grid.map.get(`${ix + dx},${iy + dy},${iz + dz}`);
+        if (!bucket) continue;
+        for (let b = 0; b < bucket.length; b++) {
+          const i = bucket[b];
+          const n = nodes[i];
+          if (accept && !accept(n, i)) continue;
+          const d = dist(n.position, point);
+          if (d < bestD) {
+            bestD = d;
+            best = i;
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
 /** Mulberry32 — deterministic seed. */
 function makeRng(seed) {
   let t = seed >>> 0;
@@ -234,6 +290,9 @@ export function buildSpaceColonizationSkeleton(params = {}) {
   const dens = Math.max(0.15, Math.min(4, Number(twigDensity) || 1));
   const branchMul = Math.max(0.35, Math.min(5, Number(twigBranchMult) || 2));
   const forkY = Math.max(0.25, Math.min(TREE_HEIGHT_M * 0.72, Number(forkYM) || Y_FORK_M));
+  // Soft-cap expensive twig passes (UI can go to 3–4×; wall-clock stays interactive)
+  const densEff = Math.min(dens, 2.0);
+  const MAX_AERIAL_NODES = 28_000;
 
   const rng = makeRng(seed);
 
@@ -306,28 +365,21 @@ export function buildSpaceColonizationSkeleton(params = {}) {
     }
   }
 
-  // Crown space colonization
+  // Crown space colonization (spatial grid — was O(attractors×nodes) per iter)
   let attractors = scatterAttractors(attractorCount, rng, forkY);
   for (let iter = 0; iter < maxIterations && attractors.length > 0; iter++) {
+    if (nodes.length > MAX_AERIAL_NODES) break;
     const phase = iter / maxIterations;
     const step = phase < 0.45 ? stepPrimaryM : phase < 0.75 ? stepTwigM * 1.15 : stepTwigM;
     const Di = influenceRadiusM * (phase < 0.45 ? 1.05 : phase < 0.75 ? 0.8 : 0.58);
     const Dk = killRadiusM * (phase < 0.45 ? 1.0 : phase < 0.75 ? 0.72 : 0.5);
 
+    const grid = buildNodeGrid(nodes, Math.max(0.2, Di * 0.55), (n) => !isRootKind(n.kind));
     /** @type {Map<number, Vec3>} */
     const pull = new Map();
 
     for (const attr of attractors) {
-      let best = -1;
-      let bestD = Infinity;
-      for (let i = 0; i < nodes.length; i++) {
-        if (isRootKind(nodes[i].kind)) continue; // roots don't chase crown attractors
-        const d = dist(nodes[i].position, attr);
-        if (d < bestD && d < Di) {
-          bestD = d;
-          best = i;
-        }
-      }
+      const best = nearestInGrid(grid, nodes, attr, Di, (n) => !isRootKind(n.kind));
       if (best < 0) continue;
       const dir = normalize(sub(attr, nodes[best].position));
       const acc = pull.get(best) || v3();
@@ -356,36 +408,48 @@ export function buildSpaceColonizationSkeleton(params = {}) {
 
     if (grown.length === 0) break;
 
+    const grownGrid = buildNodeGrid(grown, Math.max(0.15, Dk * 0.6));
     attractors = attractors.filter((a) => {
-      for (const g of grown) {
-        if (dist(a, g.position) < Dk) return false;
-      }
-      return true;
+      const hit = nearestInGrid(grownGrid, grown, a, Dk);
+      return hit < 0;
     });
   }
 
-  // Fine-twig pass: blossom-attachment scaffolding (scaled by twigDensity / twigBranchMult)
+  // Fine-twig pass: blossom-attachment scaffolding (capped densEff keeps rebuild interactive)
   growFineTwigs(nodes, addNode, {
     rng,
     attractors: scatterAttractors(
-      Math.max(80, Math.floor(attractorCount * 0.85 * dens)),
+      Math.min(900, Math.max(80, Math.floor(attractorCount * 0.7 * densEff))),
       rng,
       forkY
     ),
-    stepTwigM: stepTwigM * (0.58 / Math.sqrt(Math.max(0.5, dens))),
+    stepTwigM: stepTwigM * (0.58 / Math.sqrt(Math.max(0.5, densEff))),
     influenceRadiusM: influenceRadiusM * 0.55,
-    killRadiusM: killRadiusM * (0.42 / Math.sqrt(Math.max(0.5, dens))),
-    maxIterations: Math.max(25, Math.floor(maxIterations * 0.45 * dens)),
+    killRadiusM: killRadiusM * (0.42 / Math.sqrt(Math.max(0.5, densEff))),
+    maxIterations: Math.min(90, Math.max(25, Math.floor(maxIterations * 0.35 * densEff))),
     tropism: tropism * 0.5,
-    maxChildren: Math.max(2, Math.round(2 * branchMul)),
-    forkY
+    maxChildren: Math.max(2, Math.round(2 * Math.min(branchMul, 3))),
+    forkY,
+    maxAerialNodes: MAX_AERIAL_NODES
   });
-  growTerminalTwigs(nodes, addNode, rng, stepTwigM * 0.5, dens, branchMul, forkY);
+  if (nodes.length < MAX_AERIAL_NODES) {
+    growTerminalTwigs(nodes, addNode, rng, stepTwigM * 0.5, densEff, Math.min(branchMul, 3), forkY);
+  }
 
   assignArcLengths(nodes);
   assignLeonardoRadii(nodes);
   // Once shoots hit blossom-attachment gauge, fork by twigBranchMult
-  growThinScaffoldBoom(nodes, addNode, rng, stepTwigM * 0.45, dens, branchMul, forkY);
+  if (nodes.length < MAX_AERIAL_NODES) {
+    growThinScaffoldBoom(
+      nodes,
+      addNode,
+      rng,
+      stepTwigM * 0.45,
+      densEff,
+      Math.min(branchMul, 3),
+      forkY
+    );
+  }
   assignArcLengths(nodes);
   assignLeonardoRadii(nodes);
   assignParallelTransport(nodes);
@@ -427,27 +491,24 @@ function growFineTwigs(nodes, addNode, opts) {
     maxIterations,
     tropism,
     maxChildren = 4,
-    forkY = Y_FORK_M
+    forkY = Y_FORK_M,
+    maxAerialNodes = 28000
   } = opts;
   let attractors = startAttractors;
+  const acceptTwigHost = (n) =>
+    !isRootKind(n.kind) &&
+    n.kind !== 'collar' &&
+    n.kind !== 'trunk' &&
+    n.children.length <= maxChildren &&
+    n.position.y >= forkY * 0.95;
+
   for (let iter = 0; iter < maxIterations && attractors.length > 0; iter++) {
+    if (nodes.length >= maxAerialNodes) break;
+    const grid = buildNodeGrid(nodes, Math.max(0.15, influenceRadiusM * 0.5), acceptTwigHost);
     /** @type {Map<number, Vec3>} */
     const pull = new Map();
     for (const attr of attractors) {
-      let best = -1;
-      let bestD = Infinity;
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        if (isRootKind(n.kind) || n.kind === 'collar' || n.kind === 'trunk') continue;
-        // Prefer leaves / sparsely branched tips (branchMul raises child cap)
-        if (n.children.length > maxChildren) continue;
-        if (n.position.y < forkY * 0.95) continue;
-        const d = dist(n.position, attr);
-        if (d < bestD && d < influenceRadiusM) {
-          bestD = d;
-          best = i;
-        }
-      }
+      const best = nearestInGrid(grid, nodes, attr, influenceRadiusM, acceptTwigHost);
       if (best < 0) continue;
       const dir = normalize(sub(attr, nodes[best].position));
       pull.set(best, add(pull.get(best) || v3(), dir));
@@ -456,13 +517,13 @@ function growFineTwigs(nodes, addNode, opts) {
 
     const grown = [];
     for (const [nodeId, acc] of pull) {
+      if (nodes.length + grown.length >= maxAerialNodes) break;
       let dir = normalize(acc);
       dir = normalize(add(dir, v3(0, tropism, 0)));
       const outward = normalize(
         v3(nodes[nodeId].position.x, 0.05, nodes[nodeId].position.z)
       );
       if (len(outward) > 0.01) dir = normalize(add(dir, scale(outward, 0.18)));
-      // Fan a bit with noise so twigs aren't collinear
       dir = normalize(
         add(dir, v3((rng() - 0.5) * 0.25, (rng() - 0.5) * 0.1, (rng() - 0.5) * 0.25))
       );
@@ -473,12 +534,8 @@ function growFineTwigs(nodes, addNode, opts) {
       grown.push(addNode(nextPos, nodeId, 'twig'));
     }
     if (grown.length === 0) break;
-    attractors = attractors.filter((a) => {
-      for (const g of grown) {
-        if (dist(a, g.position) < killRadiusM) return false;
-      }
-      return true;
-    });
+    const grownGrid = buildNodeGrid(grown, Math.max(0.1, killRadiusM * 0.6));
+    attractors = attractors.filter((a) => nearestInGrid(grownGrid, grown, a, killRadiusM) < 0);
   }
 }
 
@@ -572,7 +629,7 @@ function growThinScaffoldBoom(
   }
 
   let added = 0;
-  const maxAdd = Math.max(500, Math.floor(7000 * dens));
+  const maxAdd = Math.min(8_000, Math.max(500, Math.floor(4500 * dens)));
   const hostKeep = Math.min(1, dens);
   for (const n of hosts) {
     if (added >= maxAdd) break;

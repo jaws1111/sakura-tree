@@ -248,7 +248,8 @@ export class ProceduralSakuraEngine {
         ? ` · simplify ${(sim.reduction * 100).toFixed(0)}% (${sim.trianglesBefore}→${sim.trianglesAfter})`
         : '';
       console.info(
-        `[BarkVolume] bake ${s.bakeMs?.toFixed?.(0) ?? '?'} ms · ` +
+        `[BarkVolume] bake ${s.bakeMs?.toFixed?.(0) ?? '?'} ms ` +
+          `(sk ${s.skeletonMs?.toFixed?.(0) ?? '?'} / mesh ${s.meshMs?.toFixed?.(0) ?? '?'}) · ` +
           `${s.triangles} tris · edges ${s.edgeCount} ` +
           `(roots ${sk.stats?.rootEdges ?? '?'} / shoots ${sk.stats?.shootEdges ?? '?'}) · ` +
           `voxel ${s.voxelM} m · y[${s.boundsMinM?.y?.toFixed(2)}, ${s.boundsMaxM?.y?.toFixed(2)}] m` +

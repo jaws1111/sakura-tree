@@ -35,7 +35,7 @@ export const DEFAULT_BAKE_PARAMS = Object.freeze({
   includeRoots: true,
   /** Finer voxel → smoother SDF→MC (0.1 was visibly chunky). */
   voxelM: 0.065,
-  nearestK: 16,
+  nearestK: 10,
   includeBark: true,
   /** Lower = keep more MC detail after vertex clustering. */
   simplifyCellScale: 1.15,
@@ -76,6 +76,8 @@ export class BarkVolumeMesher {
    */
   buildSkeleton(params = {}) {
     const p = { ...this.defaults, ...params };
+    const t0 =
+      typeof performance !== 'undefined' ? performance.now() : Date.now();
     this.skeleton = buildSpaceColonizationSkeleton({
       seed: p.seed,
       attractorCount: p.attractorCount,
@@ -97,6 +99,9 @@ export class BarkVolumeMesher {
       twigBranchMult: p.twigBranchMult,
       forkYM: p.forkYM
     });
+    const t1 =
+      typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this._lastSkeletonMs = t1 - t0;
     return this.skeleton;
   }
 
@@ -129,7 +134,9 @@ export class BarkVolumeMesher {
 
     const t1 =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
-    stats.bakeMs = t1 - t0;
+    stats.meshMs = t1 - t0;
+    stats.skeletonMs = this._lastSkeletonMs ?? 0;
+    stats.bakeMs = stats.meshMs + stats.skeletonMs;
     stats.edgeCount = skeleton.edges.length;
     stats.nodeCount = skeleton.nodes.length;
     stats.hero = {

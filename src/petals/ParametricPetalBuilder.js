@@ -2,130 +2,78 @@ import * as THREE from 'three';
 import {
   PETAL_LENGTH_M,
   PETAL_WIDTH_M,
-  CLUSTER_SPAN_M,
   FLOWER_DIAMETER_M
 } from '../units.js';
 
 /**
- * Analytic sakura petal / blossom-cluster geometry.
- * All lengths are metres (1 world unit = 1 m). Cup/curl/crease are fractions of L.
+ * Folded-plane sakura petal (4 triangles) + 5-leaf blossom.
+ * Shape / edge fade live in the blossom ShaderMaterial (see SakuraMaterialFactory).
  */
 export class ParametricPetalBuilder {
   /**
+   * Single leaf — folded plane, 2 quads / 4 triangles (~7° crease).
+   * Local space: Y along length (base→tip), X width, Z fold depth.
    * @param {object} [opts]
-   * @param {number} [opts.length=PETAL_LENGTH_M] Petal length (m)
-   * @param {number} [opts.maxWidth=PETAL_WIDTH_M] Full lamina width (m)
-   * @param {number} [opts.notchDepth=0.55] Apical cleft depth β (dimensionless)
-   * @param {number} [opts.sigmaNotch=0.06] Notch decay along v
-   * @param {number} [opts.sigmaCleft=0.04] Cleft decay along u
-   * @param {number} [opts.cupIntensity=0.12] Cup amplitude as fraction of L (~2 mm)
-   * @param {number} [opts.curlIntensity=0.08] Longitudinal curl as fraction of L
-   * @param {number} [opts.creaseIntensity=0.05] Central V-crease as fraction of L
-   * @param {number} [opts.segmentsU=7] Lateral subdivisions (M)
-   * @param {number} [opts.segmentsV=11] Longitudinal subdivisions (N)
+   * @param {number} [opts.length=PETAL_LENGTH_M]
+   * @param {number} [opts.width=PETAL_WIDTH_M]
+   * @param {number} [opts.foldDegrees=7]
    * @returns {THREE.BufferGeometry}
    */
-  static createPetalGeometry({
+  static createFoldedPetalGeometry({
     length = PETAL_LENGTH_M,
-    maxWidth = PETAL_WIDTH_M,
-    notchDepth = 0.55,
-    sigmaNotch = 0.06,
-    sigmaCleft = 0.04,
-    cupIntensity = 0.12,
-    curlIntensity = 0.08,
-    creaseIntensity = 0.05,
-    segmentsU = 7,
-    segmentsV = 11
+    width = PETAL_WIDTH_M,
+    foldDegrees = 7
   } = {}) {
-    const geometry = new THREE.BufferGeometry();
-    const positions = [];
-    const normals = [];
-    const uvs = [];
-    const indices = [];
+    const geo = new THREE.BufferGeometry();
+    const rad = (foldDegrees * Math.PI) / 180;
+    const halfW = width * 0.5;
+    const halfH = length * 0.5;
+    const z = Math.tan(rad) * halfW;
 
-    // Peak of v^0.6 * (1-v)^0.4 so envelope normalizes ~1 at widest section
-    const envelopePeak = Math.pow(0.6, 0.6) * Math.pow(0.4, 0.4);
+    // Base at y=-halfH (flower center), tip at y=+halfH
+    const positions = new Float32Array([
+      -halfW, -halfH, z, // 0 left bottom
+      -halfW, halfH, z, // 1 left top
+      0, -halfH, 0, // 2 center bottom
+      0, halfH, 0, // 3 center top
+      halfW, -halfH, z, // 4 right bottom
+      halfW, halfH, z // 5 right top
+    ]);
 
-    const samplePoint = (u, v) => {
-      const xRel = u - 0.5;
-      const vv = Math.min(Math.max(v, 1e-6), 1 - 1e-6);
+    const uvs = new Float32Array([0, 0, 0, 1, 0.5, 0, 0.5, 1, 1, 0, 1, 1]);
 
-      // Spade-like half-width envelope with apical notch (§2.1)
-      const envelope = Math.pow(vv, 0.6) * Math.pow(1.0 - vv, 0.4);
-      const notch =
-        Math.exp(-(v - 1.0) * (v - 1.0) / (2.0 * sigmaNotch * sigmaNotch)) *
-        Math.exp(-(xRel * xRel) / (2.0 * sigmaCleft * sigmaCleft));
-      const widthFactor = Math.max(0.0, (envelope / envelopePeak) * (1.0 - notchDepth * notch));
+    const indices = [
+      0, 2, 1, 1, 2, 3, // left quad
+      2, 4, 3, 3, 4, 5 // right quad
+    ];
 
-      // maxWidth is full lamina width in metres
-      const x = xRel * maxWidth * widthFactor;
-      const y = v * length;
-
-      // Vertical deflection in metres (intensities are fractions of length)
-      const cup = -cupIntensity * length * 4.0 * (xRel * xRel) * Math.sqrt(Math.max(v, 0));
-      const curl = curlIntensity * length * v * v;
-      const crease = -creaseIntensity * length * Math.abs(xRel) * (1.0 - v);
-      const z = cup + curl + crease;
-
-      return new THREE.Vector3(x, y, z);
-    };
-
-    for (let iv = 0; iv <= segmentsV; iv++) {
-      const v = iv / segmentsV;
-      for (let iu = 0; iu <= segmentsU; iu++) {
-        const u = iu / segmentsU;
-        const pt = samplePoint(u, v);
-        positions.push(pt.x, pt.y, pt.z);
-        uvs.push(u, v);
-
-        // Finite-difference normals
-        const delta = 0.005;
-        const ptU = samplePoint(Math.min(1.0, u + delta), v);
-        const ptV = samplePoint(u, Math.min(1.0, v + delta));
-        const dU = new THREE.Vector3().subVectors(ptU, pt);
-        const dV = new THREE.Vector3().subVectors(ptV, pt);
-        const norm = new THREE.Vector3().crossVectors(dU, dV).normalize();
-        if (norm.z < 0) norm.negate();
-        normals.push(norm.x, norm.y, norm.z);
-      }
-    }
-
-    const stride = segmentsU + 1;
-    for (let iv = 0; iv < segmentsV; iv++) {
-      for (let iu = 0; iu < segmentsU; iu++) {
-        const a = iv * stride + iu;
-        const b = (iv + 1) * stride + iu;
-        const c = (iv + 1) * stride + (iu + 1);
-        const d = iv * stride + (iu + 1);
-        indices.push(a, b, d, b, c, d);
-      }
-    }
-
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    geometry.setIndex(indices);
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
-
-    return geometry;
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    geo.computeBoundingBox();
+    geo.computeBoundingSphere();
+    geo.userData.triangleCount = 4;
+    return geo;
   }
 
-  /** Compact bud: low-segment petal, tightly cupped. */
-  static createBudGeometry() {
-    return this.createPetalGeometry({
-      length: PETAL_LENGTH_M * 0.55,
-      maxWidth: PETAL_WIDTH_M * 0.45,
-      cupIntensity: 0.22,
-      curlIntensity: 0.18,
-      creaseIntensity: 0.03,
-      notchDepth: 0.2,
-      segmentsU: 4,
-      segmentsV: 5
+  /** @deprecated Prefer createFoldedPetalGeometry — kept for callers. */
+  static createPetalGeometry(opts = {}) {
+    return this.createFoldedPetalGeometry({
+      length: opts.length ?? PETAL_LENGTH_M,
+      width: opts.maxWidth ?? opts.width ?? PETAL_WIDTH_M,
+      foldDegrees: opts.foldDegrees ?? 7
     });
   }
 
-  /** Simple stamen / receptacle core (~80 tris). */
+  static createBudGeometry() {
+    return this.createFoldedPetalGeometry({
+      length: PETAL_LENGTH_M * 0.55,
+      width: PETAL_WIDTH_M * 0.45,
+      foldDegrees: 10
+    });
+  }
+
   static createStamenCoreGeometry() {
     const r = FLOWER_DIAMETER_M * 0.12;
     const geom = new THREE.SphereGeometry(r, 8, 6);
@@ -160,34 +108,19 @@ export class ParametricPetalBuilder {
   }
 
   /**
-   * Blossom cluster. `lite` ≈ Kanzan pom-pom (dense double-flower, low segs).
-   * Physical span ≈ CLUSTER_SPAN_M.
-   * @param {number|object} [seedOrOpts=1]
+   * Standard blossom: 5 folded leaves in a star.
+   * Pivot is at each leaf's BASE (not mid-leaf) so tips radiate outward.
+   * 5 × 4 tris = 20 triangles.
+   * @param {object} [opts]
    * @returns {THREE.BufferGeometry}
    */
-  static createBlossomClusterGeometry(seedOrOpts = 1) {
-    const opts =
-      typeof seedOrOpts === 'object' && seedOrOpts
-        ? seedOrOpts
-        : { seed: seedOrOpts };
+  static createFiveLeafBlossom(opts = {}) {
     const seed = (opts.seed >>> 0) || 1;
-    const quality =
-      opts.quality === 'high' ? 'high' : opts.quality === 'playable' ? 'playable' : 'lite';
-    const kanzan = opts.kanzan !== false && quality === 'lite';
-    const flowers =
-      opts.flowers ?? (quality === 'high' ? 4 : quality === 'playable' ? 2 : 1);
-    const buds =
-      opts.buds ?? (quality === 'high' ? 2 : quality === 'playable' ? 1 : 0);
-    const segU =
-      opts.segmentsU ?? (quality === 'high' ? 7 : quality === 'playable' ? 4 : 2);
-    const segV =
-      opts.segmentsV ?? (quality === 'high' ? 11 : quality === 'playable' ? 6 : 2);
-    const includeStamen = opts.includeStamen ?? quality === 'high';
-    // Kanzan-style: many petals in 2 layers → pom-pom mass
-    const petalsPerFlower =
-      opts.petalsPerFlower ??
-      (kanzan ? 16 : quality === 'lite' ? 5 : 5);
-    const layers = opts.layers ?? (kanzan ? 2 : 1);
+    const leafCount = opts.petalsPerFlower ?? 5;
+    const length = opts.length ?? PETAL_LENGTH_M * 1.05;
+    const width = opts.width ?? PETAL_WIDTH_M * 1.1;
+    // Pitch from upright: ~1.05–1.25 ≈ flat star with slight cup (reference top-down)
+    const open = opts.open ?? 1.12;
 
     let s = seed;
     const rand = () => {
@@ -195,113 +128,67 @@ export class ParametricPetalBuilder {
       return s / 0xffffffff;
     };
 
-    const petalScale = kanzan ? 0.9 : 1;
-    const petalBase = this.createPetalGeometry({
-      length: PETAL_LENGTH_M * petalScale,
-      maxWidth: PETAL_WIDTH_M * petalScale * 1.05,
-      cupIntensity: kanzan ? 0.2 : 0.12,
-      curlIntensity: kanzan ? 0.14 : 0.08,
-      creaseIntensity: 0.04,
-      notchDepth: kanzan ? 0.35 : 0.55,
-      segmentsU: segU,
-      segmentsV: segV
+    const leaf = this.createFoldedPetalGeometry({
+      length,
+      width,
+      foldDegrees: opts.foldDegrees ?? 7
     });
-    const budBase = this.createPetalGeometry({
-      length: PETAL_LENGTH_M * 0.55,
-      maxWidth: PETAL_WIDTH_M * 0.45,
-      cupIntensity: 0.22,
-      curlIntensity: 0.18,
-      creaseIntensity: 0.03,
-      notchDepth: 0.2,
-      segmentsU: Math.max(2, segU - 1),
-      segmentsV: Math.max(2, segV - 1)
-    });
-    const stamen = this.createStamenCoreGeometry();
 
     const arrays = { positions: [], normals: [], uvs: [], indices: [] };
     let indexOffset = 0;
-    const halfSpan = CLUSTER_SPAN_M * (kanzan ? 0.38 : 0.5);
+    const halfH = length * 0.5;
+    // Folded petal spans y∈[-halfH,+halfH]; shift so BASE (y=-halfH) → origin
+    const toBasePivot = new THREE.Matrix4().makeTranslation(0, halfH, 0);
+    // Tiny gap at the flower eye (reference has a clear center)
+    const eye = length * 0.08;
 
-    for (let f = 0; f < flowers; f++) {
-      const flowerOrigin = new THREE.Vector3(
-        (rand() - 0.5) * halfSpan * (kanzan ? 0.9 : 1.6),
-        (rand() - 0.5) * halfSpan * (kanzan ? 0.55 : 0.9),
-        (rand() - 0.5) * halfSpan * (kanzan ? 0.9 : 1.6)
-      );
-
-      for (let layer = 0; layer < layers; layer++) {
-        const layerPetals = Math.max(
-          5,
-          Math.round(petalsPerFlower / layers + (layer === 0 ? 2 : -1))
-        );
-        const pitchBase = layer === 0 ? 0.55 : 0.22; // outer open, inner upright
-        for (let p = 0; p < layerPetals; p++) {
-          const angle =
-            (p / layerPetals) * Math.PI * 2 +
-            layer * 0.17 +
-            (rand() - 0.5) * 0.12;
-          const pitch = pitchBase + rand() * 0.18;
-          const radial = (kanzan ? 0.004 : 0) * (1 + layer);
-          const origin = flowerOrigin
-            .clone()
-            .add(
-              new THREE.Vector3(
-                Math.cos(angle) * radial,
-                layer * 0.003,
-                Math.sin(angle) * radial
-              )
-            );
-          const euler = new THREE.Euler(pitch, 0, angle, 'ZYX');
-          const matrix = new THREE.Matrix4()
-            .makeRotationFromEuler(euler)
-            .setPosition(origin);
-          indexOffset = this.#appendTransformed(petalBase, matrix, arrays, indexOffset);
-        }
-      }
+    for (let p = 0; p < leafCount; p++) {
+      const yaw = (p / leafCount) * Math.PI * 2;
+      const pitch = open + (rand() - 0.5) * 0.06;
+      // M = T_eye * R_yaw * R_pitch * T_basePivot
+      // Tip points radially outward; rotation hinge is the base at the eye.
+      const m = new THREE.Matrix4()
+        .makeTranslation(
+          Math.cos(yaw) * eye,
+          length * 0.01,
+          Math.sin(yaw) * eye
+        )
+        .multiply(new THREE.Matrix4().makeRotationY(yaw))
+        .multiply(new THREE.Matrix4().makeRotationX(pitch))
+        .multiply(toBasePivot);
+      indexOffset = this.#appendTransformed(leaf, m, arrays, indexOffset);
     }
 
-    for (let b = 0; b < buds; b++) {
-      const budOrigin = new THREE.Vector3(
-        (rand() - 0.5) * halfSpan,
-        (rand() - 0.5) * halfSpan * 0.6,
-        (rand() - 0.5) * halfSpan
-      );
-      const euler = new THREE.Euler(
-        0.15 + rand() * 0.35,
-        rand() * Math.PI * 2,
-        (rand() - 0.5) * 0.4,
-        'YXZ'
-      );
-      const matrix = new THREE.Matrix4()
-        .makeRotationFromEuler(euler)
-        .setPosition(budOrigin);
-      indexOffset = this.#appendTransformed(budBase, matrix, arrays, indexOffset);
-    }
+    leaf.dispose();
 
-    if (includeStamen) {
-      const matrix = new THREE.Matrix4().makeTranslation(0, 0.002, 0);
-      this.#appendTransformed(stamen, matrix, arrays, indexOffset);
-    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(arrays.positions, 3));
+    geom.setAttribute('normal', new THREE.Float32BufferAttribute(arrays.normals, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(arrays.uvs, 2));
+    geom.setIndex(arrays.indices);
+    geom.computeBoundingBox();
+    geom.computeBoundingSphere();
+    geom.userData.triangleCount = arrays.indices.length / 3;
+    geom.userData.leafCount = leafCount;
+    return geom;
+  }
 
-    petalBase.dispose();
-    budBase.dispose();
-    stamen.dispose();
-
-    const clusterGeom = new THREE.BufferGeometry();
-    clusterGeom.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(arrays.positions, 3)
-    );
-    clusterGeom.setAttribute(
-      'normal',
-      new THREE.Float32BufferAttribute(arrays.normals, 3)
-    );
-    clusterGeom.setAttribute('uv', new THREE.Float32BufferAttribute(arrays.uvs, 2));
-    clusterGeom.setIndex(arrays.indices);
-    clusterGeom.computeBoundingBox();
-    clusterGeom.computeBoundingSphere();
-    clusterGeom.userData.triangleCount = arrays.indices.length / 3;
-
-    return clusterGeom;
+  /**
+   * Canopy instance mesh — one 5-leaf blossom (far LOD can use same, slightly tighter).
+   * @param {number|object} [seedOrOpts=1]
+   * @returns {THREE.BufferGeometry}
+   */
+  static createBlossomClusterGeometry(seedOrOpts = 1) {
+    const opts =
+      typeof seedOrOpts === 'object' && seedOrOpts ? seedOrOpts : { seed: seedOrOpts };
+    const far = opts.quality === 'lite' && opts.segmentsU != null && opts.segmentsU <= 2;
+    return this.createFiveLeafBlossom({
+      seed: opts.seed ?? 1,
+      petalsPerFlower: 5,
+      length: PETAL_LENGTH_M * (far ? 0.95 : 1.05),
+      width: PETAL_WIDTH_M * (far ? 1.0 : 1.1),
+      open: far ? 0.65 : 0.72,
+      foldDegrees: 7
+    });
   }
 }

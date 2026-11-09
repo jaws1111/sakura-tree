@@ -421,7 +421,9 @@ export class FallingPetalDriftSystem {
     const i3 = i * 3;
     const justLanded = this.settleAge[i] < 0;
 
-    this.positions[i3 + 1] = groundY + 0.002;
+    // Keep blossom above terrain so transparent edges don't z-fight / vanish
+    const lift = Math.max(0.014, 0.022 * (this.petalScale || 1));
+    this.positions[i3 + 1] = groundY + lift;
     this.velocities[i3] = 0;
     this.velocities[i3 + 1] = 0;
     this.velocities[i3 + 2] = 0;
@@ -459,7 +461,8 @@ export class FallingPetalDriftSystem {
       const i3 = i * 3;
       const groundY = this.heightAt(this.positions[i3], this.positions[i3 + 2]);
 
-      if (this.settleAge[i] >= 0 || this.positions[i3 + 1] <= groundY + 0.002) {
+      const lift = Math.max(0.014, 0.022 * (this.petalScale || 1));
+      if (this.settleAge[i] >= 0 || this.positions[i3 + 1] <= groundY + lift * 0.5) {
         this._settleOnGround(i, dt, groundY);
         this._writeInstance(i);
         continue;

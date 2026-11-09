@@ -227,12 +227,11 @@ export function scatterMossOnMesh(mesh, opts = {}) {
   if (!mesh || !mesh.geometry) return null;
 
   const maxCount = opts.maxCount ?? BARK_MOSS_MAX;
-  const geom = mesh.geometry.index
-    ? mesh.geometry.toNonIndexed()
-    : mesh.geometry.clone();
-
+  const geom = mesh.geometry;
   const pos = geom.attributes.position;
-  const triCount = pos.count / 3;
+  if (!pos) return null;
+  const index = geom.index;
+  const triCount = index ? index.count / 3 : pos.count / 3;
   const strandGeom = createStrandGeometry();
   const mat = createMossMaterial(0x456640);
   const instanced = new THREE.InstancedMesh(strandGeom, mat, maxCount);
@@ -254,13 +253,25 @@ export function scatterMossOnMesh(mesh, opts = {}) {
 
   let count = 0;
   // Stride through triangles; denser sample when fewer tris
-  const stride = Math.max(1, Math.floor(triCount / maxCount));
+  const stride = Math.max(1, Math.floor(triCount / Math.max(1, maxCount * 2)));
 
   for (let t = 0; t < triCount && count < maxCount; t += stride) {
-    const i = t * 3;
-    a.fromBufferAttribute(pos, i).applyMatrix4(world);
-    b.fromBufferAttribute(pos, i + 1).applyMatrix4(world);
-    c.fromBufferAttribute(pos, i + 2).applyMatrix4(world);
+    let ia;
+    let ib;
+    let ic;
+    if (index) {
+      const base = t * 3;
+      ia = index.getX(base);
+      ib = index.getX(base + 1);
+      ic = index.getX(base + 2);
+    } else {
+      ia = t * 3;
+      ib = ia + 1;
+      ic = ia + 2;
+    }
+    a.fromBufferAttribute(pos, ia).applyMatrix4(world);
+    b.fromBufferAttribute(pos, ib).applyMatrix4(world);
+    c.fromBufferAttribute(pos, ic).applyMatrix4(world);
 
     ab.subVectors(b, a);
     ac.subVectors(c, a);

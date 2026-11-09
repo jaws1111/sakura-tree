@@ -304,7 +304,7 @@ export function bakeMarchingCubes(skeleton, opts = {}) {
   const {
     voxelM = 0.055,
     iso = 0,
-    nearestK = 14,
+    nearestK = 10,
     includeBark = true,
     /** Cluster cell as multiple of voxel — removes sub-shading MC noise. */
     simplifyCellScale = 1.15
@@ -336,7 +336,31 @@ export function bakeMarchingCubes(skeleton, opts = {}) {
   const sdfOpts = { nearestK, includeBark, spatialIndex };
   const mask = buildNarrowBand(edges, min, [nx, ny, nz], voxelM, pad);
 
-  // Sample field only on narrow band (+1 halo for cube corners)
+  // Dilate occupancy once (+1 halo) so sample loop stays O(band) without 27-neighbour tests
+  const sampleMask = new Uint8Array(nx * ny * nz);
+  for (let k = 0; k < nz; k++) {
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const idx = i + nx * (j + ny * k);
+        if (!mask[idx]) continue;
+        for (let dk = -1; dk <= 1; dk++) {
+          const kk = k + dk;
+          if (kk < 0 || kk >= nz) continue;
+          for (let dj = -1; dj <= 1; dj++) {
+            const jj = j + dj;
+            if (jj < 0 || jj >= ny) continue;
+            for (let di = -1; di <= 1; di++) {
+              const ii = i + di;
+              if (ii < 0 || ii >= nx) continue;
+              sampleMask[ii + nx * (jj + ny * kk)] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Sample field only on dilated narrow band
   const field = new Float32Array(nx * ny * nz);
   field.fill(1e3);
   let samples = 0;
@@ -344,28 +368,16 @@ export function bakeMarchingCubes(skeleton, opts = {}) {
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
         const idx = i + nx * (j + ny * k);
-        // include neighbour occupancy so cube corners exist
-        let occ = mask[idx];
-        if (!occ) {
-          for (let dk = -1; dk <= 1 && !occ; dk++) {
-            for (let dj = -1; dj <= 1 && !occ; dj++) {
-              for (let di = -1; di <= 1 && !occ; di++) {
-                const ii = i + di;
-                const jj = j + dj;
-                const kk = k + dk;
-                if (ii < 0 || jj < 0 || kk < 0 || ii >= nx || jj >= ny || kk >= nz) continue;
-                if (mask[ii + nx * (jj + ny * kk)]) occ = 1;
-              }
-            }
-          }
-        }
-        if (!occ) continue;
-        const p = {
-          x: min.x + i * voxelM,
-          y: min.y + j * voxelM,
-          z: min.z + k * voxelM
-        };
-        field[idx] = evaluateWoodSDF(p, edges, sdfOpts);
+        if (!sampleMask[idx]) continue;
+        field[idx] = evaluateWoodSDF(
+          {
+            x: min.x + i * voxelM,
+            y: min.y + j * voxelM,
+            z: min.z + k * voxelM
+          },
+          edges,
+          sdfOpts
+        );
         samples += 1;
       }
     }

@@ -14,7 +14,7 @@ import { SakuraMaterialFactory } from './SakuraMaterialFactory.js';
 export const CANOPY_COUNT_MAX = 2_000_000;
 export const CANOPY_COUNT_MIN = 100;
 export const BLOSSOM_SIZE_MIN = 0.25;
-export const BLOSSOM_SIZE_MAX = 2.5;
+export const BLOSSOM_SIZE_MAX = 3;
 export const PEDUNCLE_SCALE_MIN = 0.15;
 export const PEDUNCLE_SCALE_MAX = 3.5;
 
@@ -56,30 +56,23 @@ export class CanopyInstancer {
     this.castShadow = true;
     this.receiveShadow = true;
 
-    this.geoNear = ParametricPetalBuilder.createBlossomClusterGeometry({
-      seed,
-      quality: 'lite',
-      kanzan: true,
-      flowers: 1,
-      buds: 0,
-      petalsPerFlower: PLAYABLE.petalsPerFlower ?? 16,
-      layers: 2,
-      segmentsU: PLAYABLE.petalSegmentsU,
-      segmentsV: PLAYABLE.petalSegmentsV,
-      includeStamen: false
-    });
-    this.geoFar = ParametricPetalBuilder.createBlossomClusterGeometry({
+    // 5-leaf folded-plane blossoms (4 tris/leaf) — same mesh for near/far + falling
+    this.geoNear = ParametricPetalBuilder.createFiveLeafBlossom({ seed });
+    this.geoFar = ParametricPetalBuilder.createFiveLeafBlossom({
       seed: seed + 1,
-      quality: 'lite',
-      kanzan: true,
-      flowers: 1,
-      buds: 0,
-      petalsPerFlower: 10,
-      layers: 2,
-      segmentsU: 2,
-      segmentsV: 2,
-      includeStamen: false
+      open: 1.05
     });
+    // Placeholder instance attrs so the blossom shader compiles before first place
+    for (const g of [this.geoNear, this.geoFar]) {
+      g.setAttribute(
+        'aClusterCenter',
+        new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * 3), 3)
+      );
+      g.setAttribute(
+        'aInstancePhase',
+        new THREE.InstancedBufferAttribute(new Float32Array(this.capacity), 1)
+      );
+    }
 
     this.material = material ?? SakuraMaterialFactory.createBlossomMaterial();
     this.meshNear = new THREE.InstancedMesh(this.geoNear, this.material, this.capacity);
@@ -181,31 +174,41 @@ export class CanopyInstancer {
     }
     const mat = this.material;
     if (!mat) return;
-    if (opts.emissiveIntensity != null) {
-      mat.emissiveIntensity = THREE.MathUtils.clamp(opts.emissiveIntensity, 0, 1.5);
-    }
+    const u = mat.userData?.uniforms;
     if (opts.opacity != null) {
-      mat.opacity = THREE.MathUtils.clamp(opts.opacity, 0.15, 1);
+      const op = THREE.MathUtils.clamp(opts.opacity, 0.15, 1);
+      mat.opacity = op;
       mat.transparent = true;
+      if (u?.uOpacity) u.uOpacity.value = op;
     }
     if (opts.roughness != null) {
       mat.roughness = THREE.MathUtils.clamp(opts.roughness, 0.05, 1);
     }
-    const u = mat.userData?.uniforms;
     if (u && opts.brightBoost != null) {
       u.uBrightBoost.value = THREE.MathUtils.clamp(opts.brightBoost, 0, 1.5);
     }
+    if (u && opts.aoStrength != null && u.uAOStrength) {
+      u.uAOStrength.value = THREE.MathUtils.clamp(opts.aoStrength, 0, 1);
+    }
     if (u && opts.edgeFade != null) {
-      u.uEdgeFade.value = THREE.MathUtils.clamp(opts.edgeFade, 0, 1);
+      // GUI 0–1 → SDF soft-edge width (~0.01–0.12)
+      const t = THREE.MathUtils.clamp(opts.edgeFade, 0, 1);
+      u.uEdgeFade.value = 0.01 + t * 0.11;
     }
     if (opts.primaryColor != null) {
-      mat.color.set(opts.primaryColor);
+      const c = opts.primaryColor;
+      mat.color?.set?.(c);
+      u?.uColorPrimary?.value?.set?.(c);
+      u?.uPetalRim?.value?.set?.(c);
     }
-    if (opts.centerColor != null && u?.uPetalCore) {
-      u.uPetalCore.value.set(opts.centerColor);
+    if (opts.centerColor != null) {
+      const c = opts.centerColor;
+      mat.emissive?.set?.(c);
+      u?.uColorCenter?.value?.set?.(c);
+      u?.uPetalCore?.value?.set?.(c);
     }
-    if (opts.emissiveColor != null && mat.emissive) {
-      mat.emissive.set(opts.emissiveColor);
+    if (opts.emissiveIntensity != null && mat.emissiveIntensity != null) {
+      mat.emissiveIntensity = THREE.MathUtils.clamp(opts.emissiveIntensity, 0, 1.5);
     }
     mat.needsUpdate = true;
   }
@@ -284,51 +287,61 @@ export class CanopyInstancer {
   }
 
   /**
-   * Candidates ONLY from thinnest aerial wood — each seat sprouts several
-   * attachment twigs of varying length (blossom pockets / nodes).
+   * Spread seats along thin aerial wood (length-weighted) so 20–30k blossoms
+   * can fill the crown without clustering only at tips.
    * @param {import('../tree/skeleton.js').Skeleton|null} skeleton
    * @param {() => number} rand
    * @param {number} minDist
+   * @param {number} want
    */
-  #candidateTwigAnchors(skeleton, rand, minDist) {
+  #candidateTwigAnchors(skeleton, rand, minDist, want = 12000) {
     const pts = [];
     if (!skeleton?.edges?.length) return pts;
-    // Sample seats along thin shoots denser than blossom packing
-    const step = Math.max(0.02, minDist * 0.7);
-    const thin = skeleton.edges.filter((e) => {
-      if (e.isRoot) return false;
+    const forkY = this.#forkY();
+    // Include lean shoots + thin-ended laterals (not only tip stubs)
+    const thin = [];
+    let totalLen = 0;
+    for (let i = 0; i < skeleton.edges.length; i++) {
+      const e = skeleton.edges[i];
+      if (e.isRoot) continue;
       const rMin = Math.min(e.ra, e.rb);
       const rMax = Math.max(e.ra, e.rb);
-      if (rMin > 0.012) return false;
-      if (rMax > 0.05) return false;
+      if (rMin > 0.016) continue;
+      if (rMax > 0.055) continue;
       const y = (e.pa.y + e.pb.y) * 0.5;
-      return y > this.#forkY() * 0.95;
-    });
-    for (let i = thin.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      const tmp = thin[i];
-      thin[i] = thin[j];
-      thin[j] = tmp;
+      if (y < forkY * 0.9) continue;
+      const L = Math.hypot(e.pb.x - e.pa.x, e.pb.y - e.pa.y, e.pb.z - e.pa.z);
+      if (L < 0.012) continue;
+      thin.push(e);
+      totalLen += L;
     }
-    // How many peduncles fan from each wood seat (volume pocket)
-    const pocketN = minDist < 0.028 ? 5 : minDist < 0.04 ? 4 : 3;
-    const edgeStride = thin.length > 20_000 ? Math.ceil(thin.length / 12_000) : 1;
-    for (let ei = 0; ei < thin.length; ei += edgeStride) {
+    if (!thin.length || totalLen < 1e-4) return pts;
+
+    // Enough candidates for poisson fill; scale with want (was capped ~90k → >100k starved)
+    const targetSeats = Math.max(want * 2.2, want + 1500);
+    const step = Math.max(0.008, Math.min(0.06, totalLen / targetSeats));
+    // Extra ring seats when packing dense / high counts
+    const pocketN = want >= 80_000 || minDist < 0.03 ? 2 : 1;
+    const maxPts = Math.min(
+      1_200_000,
+      Math.ceil(Math.max(targetSeats * pocketN * 1.15, want * 2.5))
+    );
+
+    for (let ei = 0; ei < thin.length; ei++) {
+      if (pts.length >= maxPts) break;
       const e = thin[ei];
       const dx = e.pb.x - e.pa.x;
       const dy = e.pb.y - e.pa.y;
       const dz = e.pb.z - e.pa.z;
-      const L = Math.hypot(dx, dy, dz);
-      if (L < step * 0.35) continue;
+      const L = Math.hypot(dx, dy, dz) || 1;
       const nSeg = Math.max(1, Math.floor(L / step));
-      const phase = rand() * 0.4;
+      const phase = rand() * 0.55;
       const rAvg = (e.ra + e.rb) * 0.5;
-      const len = L || 1;
-      const tx = dx / len;
-      const ty = dy / len;
-      const tz = dz / len;
-      let ux = -dz / len;
-      let uz = dx / len;
+      const tx = dx / L;
+      const ty = dy / L;
+      const tz = dz / L;
+      let ux = -dz / L;
+      let uz = dx / L;
       const uLen = Math.hypot(ux, uz) || 1;
       ux /= uLen;
       uz /= uLen;
@@ -339,29 +352,29 @@ export class CanopyInstancer {
       vx /= vLen;
       vy /= vLen;
       vz /= vLen;
+      // Prefer mid-span seats (tips handled separately, lightly)
       for (let s = 0; s <= nSeg; s++) {
-        const t = Math.min(0.94, Math.max(0.06, (s + phase) / (nSeg + 1)));
+        if (pts.length >= maxPts) break;
+        const t = Math.min(0.92, Math.max(0.08, (s + phase) / (nSeg + 1)));
         const px = e.pa.x + dx * t;
         const py = e.pa.y + dy * t;
         const pz = e.pa.z + dz * t;
         const rLocal = e.ra + (e.rb - e.ra) * t;
-        // Bark seat + several attachment twigs of varying length around the ring
         for (let r = 0; r < pocketN; r++) {
-          const ang = ((r + rand() * 0.4) / pocketN) * Math.PI * 2;
+          const ang = ((r + rand() * 0.5) / pocketN) * Math.PI * 2 + ei * 0.37;
           const ca = Math.cos(ang);
           const sa = Math.sin(ang);
           const nx = ux * ca + vx * sa;
           const ny = vy * sa;
           const nz = uz * ca + vz * sa;
           const seat = rLocal + 0.003;
-          const ax = px + nx * seat;
-          const ay = py + ny * seat;
-          const az = pz + nz * seat;
+          // Mid-branch priority > tip so poisson fills length first
+          const midBias = 1 - Math.abs(t - 0.5) * 1.2;
           pts.push(
             this.#peduncleFromSeat(
-              ax,
-              ay,
-              az,
+              px + nx * seat,
+              py + ny * seat,
+              pz + nz * seat,
               nx,
               ny,
               nz,
@@ -369,7 +382,7 @@ export class CanopyInstancer {
               ty,
               tz,
               rand,
-              2 + (0.014 - rAvg) * 40
+              6 + midBias * 8 + (0.016 - rAvg) * 30
             )
           );
         }
@@ -379,12 +392,13 @@ export class CanopyInstancer {
   }
 
   /**
-   * Poisson-disk accept into a hash grid — maximizes coverage, kills wasteful overlap.
+   * Poisson-disk accept — shuffle for spread (no tip-first sort bias).
    * @param {object[]} candidates
    * @param {number} want
    * @param {number} minDist
+   * @param {() => number} [rand]
    */
-  #poissonSelect(candidates, want, minDist) {
+  #poissonSelect(candidates, want, minDist, rand = Math.random) {
     const cell = Math.max(1e-4, minDist);
     const inv = 1 / cell;
     /** @type {Map<string, number[]>} */
@@ -418,9 +432,24 @@ export class CanopyInstancer {
       return true;
     };
 
-    // Prefer higher-priority candidates (tips first if marked)
-    const ordered = candidates.slice().sort((a, b) => (b.pri ?? 0) - (a.pri ?? 0));
-    for (const c of ordered) {
+    // Partial Fisher–Yates: only shuffle what we may scan (avoids O(n) when n ≫ want)
+    const ordered = candidates;
+    const scanN = Math.min(ordered.length, Math.max(want * 4, want + 4000));
+    for (let i = 0; i < scanN; i++) {
+      const j = i + Math.floor(rand() * (ordered.length - i));
+      const tmp = ordered[i];
+      ordered[i] = ordered[j];
+      ordered[j] = tmp;
+      // Soft mid-branch bias without window bubble sort
+      if (i > 0 && (ordered[i].pri ?? 0) > (ordered[i - 1].pri ?? 0) && rand() > 0.55) {
+        const t = ordered[i - 1];
+        ordered[i - 1] = ordered[i];
+        ordered[i] = t;
+      }
+    }
+
+    for (let i = 0; i < scanN; i++) {
+      const c = ordered[i];
       if (accepted.length >= want) break;
       if (!farEnough(c.x, c.y, c.z)) continue;
       const id = accepted.length;
@@ -434,22 +463,24 @@ export class CanopyInstancer {
   }
 
   /**
-   * Adaptive min separation from crown volume + instance count.
-   * Higher count → slightly tighter pack, but never stack on top of each other.
+   * Adaptive min separation for poisson packing only — must NOT drive visual scale.
+   * (Tying instance scale to this made >100k look emptier: slider↑ → minDist↓ → blossoms shrink.)
    */
   #minBlossomDist(count) {
     const h = Math.max(0.5, TREE_HEIGHT_M - this.#forkY());
-    const vol = Math.PI * CROWN_RADIUS_M * CROWN_RADIUS_M * h * 0.5;
+    const vol = Math.PI * CROWN_RADIUS_M * CROWN_RADIUS_M * h * 0.55;
     const ideal = Math.cbrt(vol / Math.max(1, count));
     const sz = this.sizeScale || 1;
-    const clusterR = CLUSTER_SPAN_M * 0.4 * sz;
-    // High counts pack tighter along thin twigs; floor keeps clusters from nesting
-    let lo = clusterR * 0.75;
-    if (count >= 20_000) lo = clusterR * 0.5;
-    if (count >= 100_000) lo = clusterR * 0.32;
-    if (count >= 500_000) lo = clusterR * 0.22;
-    const hi = clusterR * 1.7;
-    return THREE.MathUtils.clamp(ideal * 0.85 * sz, lo, hi);
+    const clusterR = CLUSTER_SPAN_M * 0.38 * sz;
+    let lo = clusterR * 0.55;
+    if (count >= 12_000) lo = clusterR * 0.42;
+    if (count >= 20_000) lo = clusterR * 0.32;
+    if (count >= 30_000) lo = clusterR * 0.26;
+    if (count >= 80_000) lo = clusterR * 0.18;
+    if (count >= 200_000) lo = clusterR * 0.12;
+    if (count >= 500_000) lo = clusterR * 0.08;
+    const hi = clusterR * 1.5;
+    return THREE.MathUtils.clamp(ideal * 0.9 * sz, lo, hi);
   }
 
   #rng(seed) {
@@ -502,23 +533,24 @@ export class CanopyInstancer {
     const tips = this.#collectTips(sk);
     const minDist = this.#minBlossomDist(target);
 
-    // Wood seats + varying-length attachment twigs (volume pockets, not bark stacks)
-    const candidates = [];
+    // Primary: seats spread along thin branch length
+    const candidates = this.#candidateTwigAnchors(sk, rand, minDist, target);
+
+    // Light tip garnish only (avoid tip-clumping that left mid-branches bare)
+    const tipCap = Math.min(tips.length, Math.max(80, Math.floor(target * 0.08)));
     for (let i = tips.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
       const tmp = tips[i];
       tips[i] = tips[j];
       tips[j] = tmp;
     }
-    // Tip seats: several attachment twigs of varying length → blossom pockets at tips
-    const tipPockets = minDist < 0.03 ? 5 : 3;
-    for (const n of tips) {
+    for (let ti = 0; ti < tipCap; ti++) {
+      const n = tips[ti];
       const T = n.T || { x: 0, y: 1, z: 0 };
       const tLen = Math.hypot(T.x, T.y, T.z) || 1;
       const tx = T.x / tLen;
       const ty = T.y / tLen;
       const tz = T.z / tLen;
-      // Stable radial basis perpendicular to tip tangent
       let rx = -tz;
       let rz = tx;
       let rLen = Math.hypot(rx, rz);
@@ -529,56 +561,50 @@ export class CanopyInstancer {
       }
       rx /= rLen;
       rz /= rLen;
-      // Second axis = T × r
-      let ux = ty * rz - tz * 0;
+      let ux = ty * rz;
       let uy = tz * rx - tx * rz;
-      let uz = tx * 0 - ty * rx;
+      let uz = -ty * rx;
       const uLen = Math.hypot(ux, uy, uz) || 1;
       ux /= uLen;
       uy /= uLen;
       uz /= uLen;
-      for (let k = 0; k < tipPockets; k++) {
-        const ang = ((k + rand() * 0.35) / tipPockets) * Math.PI * 2;
-        const ca = Math.cos(ang);
-        const sa = Math.sin(ang);
-        let onx = rx * ca + ux * sa;
-        let ony = 0 * ca + uy * sa;
-        let onz = rz * ca + uz * sa;
-        const oLen = Math.hypot(onx, ony, onz) || 1;
-        onx /= oLen;
-        ony /= oLen;
-        onz /= oLen;
-        const seat = n.radius + 0.003;
-        candidates.push(
-          this.#peduncleFromSeat(
-            n.position.x + onx * seat,
-            n.position.y + ony * seat,
-            n.position.z + onz * seat,
-            onx,
-            ony,
-            onz,
-            tx,
-            ty,
-            tz,
-            rand,
-            5 + (0.012 - n.radius) * 50
-          )
-        );
-      }
+      const ang = rand() * Math.PI * 2;
+      const ca = Math.cos(ang);
+      const sa = Math.sin(ang);
+      let onx = rx * ca + ux * sa;
+      let ony = uy * sa;
+      let onz = rz * ca + uz * sa;
+      const oLen = Math.hypot(onx, ony, onz) || 1;
+      onx /= oLen;
+      ony /= oLen;
+      onz /= oLen;
+      const seat = n.radius + 0.003;
+      candidates.push(
+        this.#peduncleFromSeat(
+          n.position.x + onx * seat,
+          n.position.y + ony * seat,
+          n.position.z + onz * seat,
+          onx,
+          ony,
+          onz,
+          tx,
+          ty,
+          tz,
+          rand,
+          2 + (0.012 - n.radius) * 20
+        )
+      );
     }
-    const twigAnchors = this.#candidateTwigAnchors(sk, rand, minDist);
-    for (let i = 0; i < twigAnchors.length; i++) candidates.push(twigAnchors[i]);
 
-    let pts = this.#poissonSelect(candidates, target, minDist);
+    // Adaptive single/double pass — avoid 4 full poisson scans
+    let pts = this.#poissonSelect(candidates, target, minDist, rand);
     if (pts.length < target * 0.9) {
-      pts = this.#poissonSelect(candidates, target, minDist * 0.65);
-    }
-    if (pts.length < target * 0.9) {
-      pts = this.#poissonSelect(candidates, target, minDist * 0.4);
-    }
-    if (pts.length < target * 0.85) {
-      // Tighter pack in pocket volume — still only peduncle-tethered candidates
-      pts = this.#poissonSelect(candidates, target, Math.max(0.01, minDist * 0.22));
+      pts = this.#poissonSelect(
+        candidates,
+        target,
+        Math.max(0.01, minDist * (pts.length < target * 0.7 ? 0.35 : 0.55)),
+        rand
+      );
     }
     // Only peduncle tips from thin-wood seats — no free crown cloud
     const placed = pts.length;
@@ -604,10 +630,9 @@ export class CanopyInstancer {
     for (let i = 0; i < placed; i++) {
       const p = pts[i];
       dummy.position.set(p.x, p.y, p.z);
-      // Size slider drives cluster scale; packing minDist already tracks sizeScale
+      // Visual size follows Blossom size only — do not shrink with canopy count / minDist
       const sz = this.sizeScale || 1;
-      const sMax = Math.min(1.15 * sz, (minDist / (CLUSTER_SPAN_M * 0.5)) * 0.85);
-      dummy.scale.setScalar((0.7 + rand() * 0.25) * sMax);
+      dummy.scale.setScalar((0.78 + rand() * 0.28) * sz);
       if (p.tx != null) {
         const tang = new THREE.Vector3(p.tx, p.ty, p.tz);
         if (tang.lengthSq() < 1e-8) tang.set(0, 1, 0);
@@ -668,8 +693,10 @@ export class CanopyInstancer {
     const farPhases = [];
 
     const lodNearM = 14;
-    const lodFarM = 36;
+    const lodFarM = 42;
     const n = this._matrices?.length ?? 0;
+    // Screen cull uses actual blossom size so high count + large size still draws
+    const screenDiam = CLUSTER_SPAN_M * Math.max(0.5, this.sizeScale || 1);
 
     for (let i = 0; i < n; i++) {
       const x = this._centers[i * 3];
@@ -682,10 +709,7 @@ export class CanopyInstancer {
           y - camera.position.y,
           z - camera.position.z
         );
-        if (
-          dist > lodFarM &&
-          !isScreenRelevant(CLUSTER_SPAN_M, dist, camera, 1.1)
-        ) {
+        if (dist > lodFarM && !isScreenRelevant(screenDiam, dist, camera, 0.85)) {
           continue;
         }
       }
