@@ -203,7 +203,6 @@ export class Atmosphere {
     this.moonLightScale = 1;
     this.sunLightScale = 1;
     this.hemiScale = 1;
-    // Look bases. User sliders stay on the fields above. #compute is the only bus writer.
     this.look = {
       exposure: 1,
       sun: 1,
@@ -377,11 +376,11 @@ export class Atmosphere {
     if (e > -0.03) {
       this.keyLight = 'sun';
       this.sun.color.copy(S.sun);
-      keyI = S.sunI * sunFade * this.sunLightScale * this.look.sun;
+      const daylightLook = this.look.sun;
+      keyI = S.sunI * sunFade * this.sunLightScale * daylightLook;
     } else {
       this.keyLight = 'moon';
       this.sun.color.set(0xa6c0ff);
-      // Daylight look scale does not dim the moon.
       keyI = 1.5 * moonFade * this.moonLightScale;
     }
     this.sun.intensity = keyI;

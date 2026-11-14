@@ -243,7 +243,7 @@ try {
       getAtmosphere: () => engine.atmosphere,
       getCanopies: () => engine.canopies()
     });
-    engine.onCanopyReady = looks.restampCanopy;
+    engine.onCanopyLookRestamp = looks.restampCanopy;
     applyRenderLook('photoreal');
   }
   // Prefer async worker bake for interactive GUI rebuilds

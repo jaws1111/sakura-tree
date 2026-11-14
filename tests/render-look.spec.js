@@ -6,7 +6,6 @@ const collectErrors = (page) => {
   page.on('console', (m) => {
     if (m.type() !== 'error') return;
     const text = m.text();
-    // Vite client noise when the harness recycles the webServer between workers.
     if (/WebSocket connection|ERR_CONNECTION_REFUSED|\[vite\]/i.test(text)) return;
     errors.push(text);
   });
@@ -16,7 +15,6 @@ const collectErrors = (page) => {
 async function openViewTab(page) {
   const tab = page.getByTestId('tab-view');
   await expect(tab).toBeVisible({ timeout: 30_000 });
-  // noWaitAfter: Vite HMR can schedule a navigation while the panel is opening.
   await tab.click({ timeout: 30_000, noWaitAfter: true });
   await expect(page.getByTestId('look-photoreal')).toBeVisible({ timeout: 15_000 });
 }
@@ -55,7 +53,6 @@ test.describe('render looks', () => {
   });
 
   test('saved look restores, and a valid query replaces it', async ({ page }) => {
-    // Three full boots need more than the default 180s budget.
     test.setTimeout(480_000);
     const errors = collectErrors(page);
     await bootInteractive(page);

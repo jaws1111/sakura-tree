@@ -1,5 +1,4 @@
 /**
- * Beauty post stack: gentle bloom + sun god-rays + SMAA.
  * EffectComposer replaces the default render target, so MSAA is lost — SMAA restores edge AA.
  */
 import * as THREE from 'three';
@@ -10,7 +9,6 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 
-/** Radial-blur light shafts from the sun's screen position (crepuscular rays). */
 const GODRAYS_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
@@ -53,7 +51,6 @@ const GODRAYS_SHADER = {
       for (int i = 0; i < 12; i++) {
         uv -= delta;
         vec3 s = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
-        // prefer bright sky / backlit petals
         float lum = dot(s, vec3(0.299, 0.587, 0.114));
         acc += s * step(0.55, lum) * illum * uWeight;
         illum *= uDecay;
@@ -108,9 +105,8 @@ export function createPostFX(opts) {
   let viewW = size.x;
   let viewH = size.y;
 
-  function publishBloom() {
+  function syncBloomFromLookBases() {
     bloom.strength = bloomBase.strength * bloomAmt;
-    // Radius and threshold stay on the look so the bloom slider cannot open the sun disc.
     bloom.radius = bloomBase.radius;
     bloom.threshold = bloomBase.threshold;
     bloom.enabled = bloom.strength > 0.01;
@@ -129,11 +125,9 @@ export function createPostFX(opts) {
       godrays.uniforms.uEnabled.value = 0;
       return;
     }
-    // Place a far point along the sun direction for screen projection
     _sun.copy(dir).multiplyScalar(800).add(camera.position);
     _ndc.copy(_sun).project(camera);
     const onScreen = _ndc.z < 1 && Math.abs(_ndc.x) < 1.35 && Math.abs(_ndc.y) < 1.35;
-    // raysAmt scales shaft intensity. The on/off test stays lowSun * raysAmt.
     const lowSun = THREE.MathUtils.clamp(1.15 - Math.abs(dir.y) * 2.2, 0, 1);
     const vis = onScreen && dir.y > -0.02 ? lowSun * raysAmt : 0;
     godrays.uniforms.uEnabled.value = vis > 0.02 ? 1 : 0;
@@ -141,7 +135,7 @@ export function createPostFX(opts) {
     godrays.uniforms.uSunPos.value.set(_ndc.x * 0.5 + 0.5, _ndc.y * 0.5 + 0.5);
   }
 
-  publishBloom();
+  syncBloomFromLookBases();
 
   return {
     composer,
@@ -155,7 +149,7 @@ export function createPostFX(opts) {
     },
     setBloom(amount) {
       bloomAmt = Math.max(0, amount);
-      publishBloom();
+      syncBloomFromLookBases();
     },
     setGodrays(amount) {
       raysAmt = Math.max(0, amount);
@@ -167,7 +161,7 @@ export function createPostFX(opts) {
         threshold: bloomDoc.threshold
       };
       rayScaleBase = rayScale;
-      publishBloom();
+      syncBloomFromLookBases();
     },
     installGrade(pass) {
       if (gradePass) throw new Error('grade pass already installed');
@@ -194,7 +188,7 @@ export function createPostFX(opts) {
         renderer.render(scene, camera);
         return;
       }
-      publishBloom();
+      syncBloomFromLookBases();
       syncSunScreen();
       composer.render();
     }

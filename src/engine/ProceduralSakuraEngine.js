@@ -141,7 +141,7 @@ export class ProceduralSakuraEngine {
     /** @type {null|((result: object) => void)} */
     this.onBarkBaked = null;
     /** @type {null|((canopy: object) => void)} */
-    this.onCanopyReady = null;
+    this.onCanopyLookRestamp = null;
 
     // Falling petals share the blossom geometry; their material is a non-swaying twin of the canopy material
     this.fallingPetals = new FallingPetalDriftSystem(this.scene, config.fallingPetalCount, {
@@ -637,8 +637,7 @@ export class ProceduralSakuraEngine {
     const heroShare = Math.max(200, Math.floor(total * 0.55));
     const petalPool = Math.max(200, Math.floor((total - heroShare) / nComp));
     const fallingPetals = this.#makeTreePetals(canopy, root, petalPool);
-    // The twin shares this canopy's uniforms, so a look can restamp the petals now.
-    this.onCanopyReady?.(canopy);
+    this.onCanopyLookRestamp?.(canopy);
 
     return { root, mesh, canopy, barkMoss, fallingPetals, seed, x, z, yaw, skeleton: result.skeleton };
   }

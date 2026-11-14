@@ -131,7 +131,6 @@ export function lookCatalog() {
   });
 }
 
-/** Query string and saved settings. Unknown values stay null and do not apply. */
 export function parseRenderLookId(raw) {
   if (typeof raw === 'string' && Object.hasOwn(RENDER_LOOKS, raw) && RENDER_LOOKS[raw].id === raw) {
     return raw;
@@ -159,7 +158,6 @@ function restampCanopy(canopy) {
 }
 
 /**
- * Once, after post FX, the atmosphere, and the canopies exist.
  * Installs the grade pass. Does not apply a look.
  * @param {{
  *   postFX: { installGrade: Function, setLookBases: Function },
@@ -186,7 +184,7 @@ export function bindRenderLooks({ postFX, getAtmosphere: atmosGet, getCanopies: 
 }
 
 /**
- * Sole picture writer. Unknown ids throw and leave the previous look in place.
+ * Unknown ids throw and leave the previous look in place.
  * @param {string} id
  * @returns {{ id: string, label: string }}
  */

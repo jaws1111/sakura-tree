@@ -48,7 +48,6 @@ export function createPmremSky({ renderer, scene, skyMesh }) {
     lastHours = hours;
 
     try {
-      // Render sky alone into a cube, then to PMREM
       const parent = skyMesh.parent;
       const pos = skyMesh.position.clone();
       scratchScene.add(skyMesh);
@@ -60,7 +59,6 @@ export function createPmremSky({ renderer, scene, skyMesh }) {
       disposeEnv();
       envRT = pmrem.fromCubemap(cam.renderTarget.texture);
       scene.environment = envRT.texture;
-      // The old literal 0.55 wiped a look's intensity on the next sun move.
       scene.environmentIntensity = environmentIntensity;
       return envRT;
     } catch (err) {
