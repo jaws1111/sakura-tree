@@ -287,6 +287,18 @@ export class CanopyInstancer {
   }
 
   /**
+   * Distance from the limb axis at which a blossom stem roots. With a v1.1 wood probe the stem root sits
+   * 0.4 mm *inside* the real bark (no visible gap, no z-fight); otherwise the legacy guess r + 3 mm.
+   */
+  #seatRadius(wood, edgeIndex, t, rFallback, nx, ny, nz) {
+    if (wood) {
+      const r = wood.radiusAt(edgeIndex, t, nx, ny, nz);
+      if (Number.isFinite(r)) return r - 0.0004;
+    }
+    return rFallback + 0.003;
+  }
+
+  /**
    * Spread seats along thin aerial wood (length-weighted) so 20–30k blossoms
    * can fill the crown without clustering only at tips.
    * @param {import('../tree/skeleton.js').Skeleton|null} skeleton
@@ -298,8 +310,11 @@ export class CanopyInstancer {
     const pts = [];
     if (!skeleton?.edges?.length) return pts;
     const forkY = this.#forkY();
+    // v1.1 meshes expose the exact bark surface; v1.0 falls back to the radius + 3 mm guess
+    const wood = skeleton.woodSurface ?? null;
     // Include lean shoots + thin-ended laterals (not only tip stubs)
     const thin = [];
+    const thinIdx = [];
     let totalLen = 0;
     for (let i = 0; i < skeleton.edges.length; i++) {
       const e = skeleton.edges[i];
@@ -313,6 +328,7 @@ export class CanopyInstancer {
       const L = Math.hypot(e.pb.x - e.pa.x, e.pb.y - e.pa.y, e.pb.z - e.pa.z);
       if (L < 0.012) continue;
       thin.push(e);
+      thinIdx.push(i);
       totalLen += L;
     }
     if (!thin.length || totalLen < 1e-4) return pts;
@@ -367,7 +383,7 @@ export class CanopyInstancer {
           const nx = ux * ca + vx * sa;
           const ny = vy * sa;
           const nz = uz * ca + vz * sa;
-          const seat = rLocal + 0.003;
+          const seat = this.#seatRadius(wood, thinIdx[ei], t, rLocal, nx, ny, nz);
           // Mid-branch priority > tip so poisson fills length first
           const midBias = 1 - Math.abs(t - 0.5) * 1.2;
           pts.push(
@@ -578,7 +594,7 @@ export class CanopyInstancer {
       onx /= oLen;
       ony /= oLen;
       onz /= oLen;
-      const seat = n.radius + 0.003;
+      const seat = this.#seatRadius(sk.woodSurface ?? null, n.id - 1, 1, n.radius, onx, ony, onz);
       candidates.push(
         this.#peduncleFromSeat(
           n.position.x + onx * seat,

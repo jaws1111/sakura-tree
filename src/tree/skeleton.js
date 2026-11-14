@@ -50,6 +50,7 @@ export const LEONARDO_DELTA = 2.45;
  * @property {Vec3} pb
  * @property {number} ra
  * @property {number} rb
+ * @property {number} raWood  start radius of the v1.1 wood model (see buildCapsuleEdges)
  * @property {number} sa  arc length at a (m)
  * @property {number} sb  arc length at b (m)
  * @property {boolean} isRoot
@@ -971,7 +972,25 @@ export function assignParallelTransport(nodes) {
   }
 }
 
-/** @param {SkeletonNode[]} nodes @returns {CapsuleEdge[]} */
+/**
+ * Thickest child of a node (first wins on ties) — the limb that *continues* through a fork.
+ * Every other child starts a new limb. Shared by the v1.1 chain mesher and edge radius model.
+ * @param {SkeletonNode[]} nodes
+ * @param {number} id
+ * @returns {number} child node id, or -1
+ */
+export function dominantChildId(nodes, id) {
+  const kids = nodes[id].children;
+  if (!kids.length) return -1;
+  let best = kids[0];
+  for (let i = 1; i < kids.length; i++) if (nodes[kids[i]].radius > nodes[best].radius) best = kids[i];
+  return best;
+}
+
+/**
+ * @param {SkeletonNode[]} nodes
+ * @returns {CapsuleEdge[]}  edges[i] belongs to node i+1 (every node except the collar has exactly one parent edge)
+ */
 export function buildCapsuleEdges(nodes) {
   /** @type {CapsuleEdge[]} */
   const edges = [];
@@ -980,6 +999,8 @@ export function buildCapsuleEdges(nodes) {
     const p = nodes[n.parent];
     const childIsRoot = isRootKind(n.kind);
     const parentIsRoot = isRootKind(p.kind);
+    // A limb that *starts* here (side branch / root off the collar) is as thick as itself, not as its parent.
+    const startsLimb = p.id === 0 || dominantChildId(nodes, p.id) !== n.id;
     edges.push({
       a: p.id,
       b: n.id,
@@ -987,6 +1008,8 @@ export function buildCapsuleEdges(nodes) {
       pb: copy(n.position),
       ra: p.radius,
       rb: n.radius,
+      /** wood-model start radius (v1.1): ra for continuing limbs, min(ra,rb) where a new limb starts */
+      raWood: startsLimb ? Math.min(p.radius, n.radius) : p.radius,
       sa: p.arcLength,
       sb: n.arcLength,
       isRoot: childIsRoot || (parentIsRoot && p.kind !== 'collar'),
